@@ -1,0 +1,405 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>FreshGuard – Protection In Every Drop</title>
+  <meta name="description"
+    content="India's #1 scientifically formulated cleaning brand. Eliminate 99.9% of germs. Keep your home fresh, clean, and protected.">
+  <link
+    href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@400;600;700;800&family=DM+Sans:wght@300;400;500;600&display=swap"
+    rel="stylesheet">
+  <link rel="stylesheet" href="styles.css">
+</head>
+
+<body>
+
+  <!-- NAV -->
+  <nav>
+    <div class="nav-inner">
+      <div class="logo" onclick="window.scrollTo({top:0,behavior:'smooth'})">
+        <span class="logo-name">🌿 FreshGuard</span>
+        <span class="logo-tag">Protection In Every Drop</span>
+      </div>
+      <div class="search-bar">
+        <input type="text" id="searchInput" placeholder="Search for floor cleaner, glass cleaner..."
+          oninput="handleSearch(this.value)">
+        <button onclick="handleSearch(document.getElementById('searchInput').value)">🔍 Search</button>
+      </div>
+      <div class="nav-actions">
+        <div class="signin-wrapper" id="authWrapper">
+          <button class="nav-btn" onclick="toggleAuthCard()">
+            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+            </svg>
+            Sign In
+          </button>
+
+          <div class="auth-card" id="authCard">
+            <div class="heading" id="cardHeading">Log In</div>
+            <form class="form" id="cardForm"
+              onsubmit="event.preventDefault(); showToast('Success!', 'success'); toggleAuthCard()">
+              <div class="input-field" id="cardNameField" style="display:none; margin-bottom: 20px;">
+                <input type="text" id="card-name">
+                <label for="card-name">Full Name</label>
+              </div>
+              <div class="input-field" style="margin-bottom: 20px;">
+                <input type="text" required id="card-email">
+                <label for="card-email">Mobile Number or Email</label>
+              </div>
+              <div class="input-field">
+                <input type="password" required id="card-password">
+                <label for="card-password">Password</label>
+              </div>
+              <div class="btn-container" style="margin-top: 24px;">
+                <button class="btn" type="submit" id="cardSubmitBtn">Submit</button>
+              </div>
+              <div style="text-align:center;font-size:13px;margin-top:16px;color:#64748b;" id="cardSwitchText">
+                Don't have an account? <span style="color:#0034de;font-weight:bold;cursor:pointer;"
+                  onclick="toggleCardMode()">Sign Up</span>
+              </div>
+            </form>
+          </div>
+        </div>
+        <button class="nav-btn" onclick="showToast('Wishlist saved!','success')">
+          <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+              d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
+          </svg>
+          Wishlist
+        </button>
+        <button class="nav-btn cart-badge" onclick="openCart()">
+          <div style="position:relative;display:inline-block">
+            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" width="22" height="22">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" />
+            </svg>
+            <span class="badge" id="cartBadge" style="display:none">0</span>
+          </div>
+          Cart
+        </button>
+        <button class="nav-btn" onclick="showToast('Track your orders here!','success')">
+          <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+              d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+          </svg>
+          Orders
+        </button>
+      </div>
+  </nav>
+
+  <!-- SUBNAV -->
+  <div class="subnav">
+    <div class="subnav-inner">
+      <div class="snav-item active" onclick="filterCat('all')">All Products</div>
+      <div class="snav-item" onclick="filterCat('floor')">🧹 Floor Cleaners</div>
+      <div class="snav-item" onclick="filterCat('toilet')">🚽 Toilet Cleaners</div>
+      <div class="snav-item" onclick="filterCat('glass')">🪟 Glass Cleaners</div>
+      <div class="snav-item" onclick="filterCat('combo')">📦 Combo Packs</div>
+      <div class="snav-item" onclick="showToast('Festive deals loaded!','success')">🎉 Festive Deals</div>
+      <div class="snav-item" onclick="showToast('Bulk order discount applied!','success')">🏭 Bulk Orders</div>
+      <div class="snav-item" onclick="showToast('Subscription coming soon!','success')">🔁 Subscribe &amp; Save</div>
+    </div>
+  </div>
+
+  <!-- OFFERS STRIP -->
+  <div class="offers-strip">
+    <div class="offer-item"><span class="oi">🚚</span> <strong>FREE Delivery</strong> on orders above ₹299</div>
+    <div class="offer-item"><span class="oi">💳</span> Extra <strong>10% off</strong> on UPI payments</div>
+    <div class="offer-item"><span class="oi">🔁</span> <strong>Subscribe &amp; Save</strong> up to 15%</div>
+    <div class="offer-item"><span class="oi">🎁</span> Buy 3, Get <strong>1 FREE</strong> on all cleaners</div>
+    <div class="offer-item"><span class="oi">⭐</span> <strong>FreshGuard Plus</strong> – Premium Membership</div>
+  </div>
+
+  <!-- HERO -->
+  <div class="hero">
+    <div class="hero-left">
+      <div class="hero-eyebrow">India's #1 Cleaning Brand</div>
+      <div class="hero-title">Protection In<br><span>Every Drop</span></div>
+      <div class="hero-sub">Scientifically formulated cleaners that eliminate 99.9% of germs. Keep your home fresh,
+        clean, and protected — naturally.</div>
+      <div class="hero-ctas">
+        <button class="btn-primary"
+          onclick="document.getElementById('products').scrollIntoView({behavior:'smooth'})">Shop Now</button>
+        <button class="btn-outline" onclick="showToast('Exploring our range!','success')">View All Products</button>
+      </div>
+    </div>
+    <div class="hero-right">
+      <div class="hero-product-card" onclick="addToCart(products[0])">
+        <div class="icon">🧴</div>
+        <div class="name">Floor Cleaner</div>
+        <div class="price">₹149</div>
+      </div>
+      <div class="hero-product-card" onclick="addToCart(products[4])">
+        <div class="icon">🚽</div>
+        <div class="name">Toilet Cleaner</div>
+        <div class="price">₹129</div>
+      </div>
+      <div class="hero-product-card" onclick="addToCart(products[8])">
+        <div class="icon">🪟</div>
+        <div class="name">Glass Cleaner</div>
+        <div class="price">₹119</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="main">
+
+    <!-- FEATURES -->
+    <div class="features">
+      <div class="feat">
+        <div class="feat-icon">🚚</div>
+        <div class="feat-title">Fast Delivery</div>
+        <div class="feat-desc">Same-day delivery in select cities</div>
+      </div>
+      <div class="feat">
+        <div class="feat-icon">✅</div>
+        <div class="feat-title">Certified Safe</div>
+        <div class="feat-desc">ISO &amp; BIS certified formulas</div>
+      </div>
+      <div class="feat">
+        <div class="feat-icon">🌿</div>
+        <div class="feat-title">Eco-Friendly</div>
+        <div class="feat-desc">Biodegradable, planet-safe</div>
+      </div>
+      <div class="feat">
+        <div class="feat-icon">↩️</div>
+        <div class="feat-title">Easy Returns</div>
+        <div class="feat-desc">7-day no-questions return policy</div>
+      </div>
+    </div>
+
+    <!-- CATEGORIES -->
+    <div class="section-header">
+      <div class="section-title">Shop by <span>Category</span></div>
+    </div>
+    <div class="cat-grid">
+      <div class="cat-card floor" onclick="filterCat('floor')">
+        <div class="cat-icon">🧹</div>
+        <div>
+          <div class="cat-name">Floor Cleaners</div>
+          <div class="cat-desc">Powerful disinfection for marble, tile, granite &amp; wooden floors. Removes stains and
+            leaves a fresh fragrance.</div>
+          <div class="cat-count">12 Products Available</div>
+        </div>
+        <div class="cat-arrow">›</div>
+      </div>
+      <div class="cat-card toilet" onclick="filterCat('toilet')">
+        <div class="cat-icon">🚽</div>
+        <div>
+          <div class="cat-name">Toilet Cleaners</div>
+          <div class="cat-desc">Thick gel formula that clings to surfaces, removes stains &amp; limescale. 100%
+            germ-free guarantee.</div>
+          <div class="cat-count">8 Products Available</div>
+        </div>
+        <div class="cat-arrow">›</div>
+      </div>
+      <div class="cat-card glass" onclick="filterCat('glass')">
+        <div class="cat-icon">🪟</div>
+        <div>
+          <div class="cat-name">Glass Cleaners</div>
+          <div class="cat-desc">Streak-free, crystal-clear finish on windows, mirrors &amp; glass surfaces. Dries
+            instantly.</div>
+          <div class="cat-count">10 Products Available</div>
+        </div>
+        <div class="cat-arrow">›</div>
+      </div>
+    </div>
+
+    <!-- DEALS -->
+    <div class="deals-section">
+      <div class="deals-header">
+        <div class="deals-title">🔥 Deal of the Day</div>
+        <div class="deal-timer">⏰ Ends in <span id="timer">05:42:17</span></div>
+      </div>
+      <div class="deals-grid">
+        <div class="deal-card"
+          onclick="addToCart({id:99,name:'Mega Floor Pack',icon:'🧴',price:399,mrp:699,category:'combo',vol:'2L×3'})">
+          <div class="icon">🧴</div>
+          <div class="name">Mega Floor Pack</div>
+          <div class="disc">43% OFF</div>
+          <div class="price">₹399 <s style="font-size:11px">₹699</s></div>
+        </div>
+        <div class="deal-card"
+          onclick="addToCart({id:98,name:'Toilet Bundle',icon:'🚽',price:249,mrp:449,category:'combo',vol:'1L×3'})">
+          <div class="icon">🚽</div>
+          <div class="name">Toilet Bundle</div>
+          <div class="disc">44% OFF</div>
+          <div class="price">₹249 <s style="font-size:11px">₹449</s></div>
+        </div>
+        <div class="deal-card"
+          onclick="addToCart({id:97,name:'Glass Pro Kit',icon:'🪟',price:179,mrp:299,category:'combo',vol:'500ml×2'})">
+          <div class="icon">🪟</div>
+          <div class="name">Glass Pro Kit</div>
+          <div class="disc">40% OFF</div>
+          <div class="price">₹179 <s style="font-size:11px">₹299</s></div>
+        </div>
+        <div class="deal-card"
+          onclick="addToCart({id:96,name:'Home Clean Combo',icon:'🏠',price:599,mrp:999,category:'combo',vol:'Assorted'})">
+          <div class="icon">🏠</div>
+          <div class="name">Home Clean Combo</div>
+          <div class="disc">40% OFF</div>
+          <div class="price">₹599 <s style="font-size:11px">₹999</s></div>
+        </div>
+        <div class="deal-card"
+          onclick="addToCart({id:95,name:'Lavender Floor',icon:'💜',price:99,mrp:179,category:'floor',vol:'1L'})">
+          <div class="icon">💜</div>
+          <div class="name">Lavender Floor</div>
+          <div class="disc">45% OFF</div>
+          <div class="price">₹99 <s style="font-size:11px">₹179</s></div>
+        </div>
+        <div class="deal-card"
+          onclick="addToCart({id:94,name:'Power Toilet Gel',icon:'💧',price:89,mrp:149,category:'toilet',vol:'750ml'})">
+          <div class="icon">💧</div>
+          <div class="name">Power Toilet Gel</div>
+          <div class="disc">40% OFF</div>
+          <div class="price">₹89 <s style="font-size:11px">₹149</s></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- PRODUCTS -->
+    <div id="products">
+      <div class="section-header">
+        <div class="section-title" id="prodTitle">All <span>Products</span></div>
+        <div class="see-all" onclick="filterCat('all')">View All ›</div>
+      </div>
+      <div class="prod-grid" id="prodGrid"></div>
+    </div>
+
+    <!-- ADD PRODUCT BOXES -->
+    <div class="add-product-section">
+      <div class="section-header">
+        <div class="section-title">Add Your <span>Product Listings</span></div>
+      </div>
+      <div class="add-grid">
+        <div class="add-box">
+          <h3>🧹 Add Floor Cleaner</h3>
+          <div class="field"><label>Product Name</label><input type="text" id="fc-name"
+              placeholder="e.g. Pine Fresh Floor Cleaner"></div>
+          <div class="field"><label>Volume</label><input type="text" id="fc-vol" placeholder="e.g. 1 Litre"></div>
+          <div class="field"><label>MRP (₹)</label><input type="number" id="fc-mrp" placeholder="e.g. 199"></div>
+          <div class="field"><label>Selling Price (₹)</label><input type="number" id="fc-price" placeholder="e.g. 149">
+          </div>
+          <div class="field"><label>Fragrance / Type</label><input type="text" id="fc-type"
+              placeholder="e.g. Lavender, Pine, Lemon"></div>
+          <div class="field"><label>Description</label><textarea id="fc-desc"
+              placeholder="Product highlights, features..."></textarea></div>
+          <button class="add-btn" onclick="addCustomProduct('floor','🧹','fc')">+ Add to Store</button>
+        </div>
+        <div class="add-box">
+          <h3>🚽 Add Toilet Cleaner</h3>
+          <div class="field"><label>Product Name</label><input type="text" id="tc-name"
+              placeholder="e.g. HyperClean Toilet Gel"></div>
+          <div class="field"><label>Volume</label><input type="text" id="tc-vol" placeholder="e.g. 750 ml"></div>
+          <div class="field"><label>MRP (₹)</label><input type="number" id="tc-mrp" placeholder="e.g. 169"></div>
+          <div class="field"><label>Selling Price (₹)</label><input type="number" id="tc-price" placeholder="e.g. 129">
+          </div>
+          <div class="field"><label>Formula Type</label><input type="text" id="tc-type"
+              placeholder="e.g. Thick Gel, Foam, Liquid"></div>
+          <div class="field"><label>Description</label><textarea id="tc-desc"
+              placeholder="Product highlights, features..."></textarea></div>
+          <button class="add-btn" onclick="addCustomProduct('toilet','🚽','tc')">+ Add to Store</button>
+        </div>
+        <div class="add-box">
+          <h3>🪟 Add Glass Cleaner</h3>
+          <div class="field"><label>Product Name</label><input type="text" id="gc-name"
+              placeholder="e.g. ClearView Glass Spray"></div>
+          <div class="field"><label>Volume</label><input type="text" id="gc-vol" placeholder="e.g. 500 ml"></div>
+          <div class="field"><label>MRP (₹)</label><input type="number" id="gc-mrp" placeholder="e.g. 149"></div>
+          <div class="field"><label>Selling Price (₹)</label><input type="number" id="gc-price" placeholder="e.g. 119">
+          </div>
+          <div class="field"><label>Finish Type</label><input type="text" id="gc-type"
+              placeholder="e.g. Streak-Free, Anti-Fog"></div>
+          <div class="field"><label>Description</label><textarea id="gc-desc"
+              placeholder="Product highlights, features..."></textarea></div>
+          <button class="add-btn" onclick="addCustomProduct('glass','🪟','gc')">+ Add to Store</button>
+        </div>
+      </div>
+    </div>
+
+  </div><!-- /main -->
+
+  <!-- FOOTER -->
+  <footer>
+    <div class="footer-grid">
+      <div class="footer-brand">
+        <h2>🌿 FreshGuard</h2>
+        <p>India's most trusted cleaning brand. Scientifically formulated for homes, offices and commercial spaces.
+          Protection In Every Drop.</p>
+      </div>
+      <div class="footer-col">
+        <h4>Products</h4>
+        <ul>
+          <li>Floor Cleaners</li>
+          <li>Toilet Cleaners</li>
+          <li>Glass Cleaners</li>
+          <li>Combo Packs</li>
+          <li>Commercial Range</li>
+        </ul>
+      </div>
+      <div class="footer-col">
+        <h4>Company</h4>
+        <ul>
+          <li>About Us</li>
+          <li>Careers</li>
+          <li>Press</li>
+          <li>Sustainability</li>
+          <li>Blog</li>
+        </ul>
+      </div>
+      <div class="footer-col">
+        <h4>Support</h4>
+        <ul>
+          <li>Help Center</li>
+          <li>Contact Us</li>
+          <li>Returns</li>
+          <li>Track Order</li>
+          <li>Privacy Policy</li>
+        </ul>
+      </div>
+    </div>
+    <div class="footer-bottom">
+      <span>© 2025 FreshGuard Pvt. Ltd. All rights reserved.</span>
+      <span>Made with 💚 for cleaner homes</span>
+    </div>
+  </footer>
+
+  <!-- CART SIDEBAR -->
+  <div class="cart-overlay" id="cartOverlay" onclick="closeCart()"></div>
+  <div class="cart-sidebar" id="cartSidebar">
+    <div class="cart-head">
+      <h2>🛒 My Cart (<span id="cartCount">0</span> items)</h2>
+      <button class="cart-close" onclick="closeCart()">✕</button>
+    </div>
+    <div class="cart-items" id="cartItems"></div>
+    <div class="cart-footer" id="cartFooter" style="display:none">
+      <div class="price-row"><span>Subtotal</span><span id="subtotal">₹0</span></div>
+      <div class="price-row"><span>Delivery</span><span id="delivery">₹49</span></div>
+      <div class="discount-row"><span>Discount</span><span id="discountAmt">-₹0</span></div>
+      <div class="price-row total"><span>Total</span><span id="grandTotal">₹0</span></div>
+      <button class="checkout-btn" onclick="openCheckout()">Proceed to Checkout →</button>
+    </div>
+  </div>
+
+  <!-- PAYMENT MODAL -->
+  <div class="modal-overlay" id="modalOverlay">
+    <div class="modal">
+      <div class="modal-head">
+        <h2 id="modalTitle">🛒 Checkout</h2>
+        <button class="modal-close" onclick="closeModal()">✕</button>
+      </div>
+      <div class="modal-body" id="modalBody"></div>
+      <div class="modal-footer" id="modalFooter"></div>
+    </div>
+  </div>
+
+  <!-- TOAST -->
+  <div class="toast-container" id="toastContainer"></div>
+
+  <script src="script.js"></script>
+</body>
+
+</html>
