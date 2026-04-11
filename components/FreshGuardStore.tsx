@@ -46,6 +46,10 @@ export default function FreshGuardStore({ initialCategory = 'all', hideHero = fa
   const [orderPlaced, setOrderPlaced] = useState<string | null>(null);
   const [authOpen, setAuthOpen] = useState(false);
   const [authMode, setAuthMode] = useState<'login' | 'signup'>('login');
+  const [currentUser, setCurrentUser] = useState<{ id: string; name: string; email: string } | null>(null);
+  const [authForm, setAuthForm] = useState({ name: '', email: '', password: '' });
+  const [authLoading, setAuthLoading] = useState(false);
+  const [pendingAction, setPendingAction] = useState<{ type: 'cart' | 'wishlist'; product: Product } | null>(null);
   const [checkoutForm, setCheckoutForm] = useState({ name: '', mobile: '', address: '', city: '', pincode: '', state: 'Uttar Pradesh' });
   
   const searchRef = useRef<HTMLInputElement>(null);
@@ -75,6 +79,97 @@ export default function FreshGuardStore({ initialCategory = 'all', hideHero = fa
       document.removeEventListener('mousedown', handleClickOutside);
     };
   }, []);
+
+  useEffect(() => {
+    const bootstrapAuth = async () => {
+      const token = typeof window !== 'undefined' ? localStorage.getItem('authToken') : null;
+      if (!token) return;
+      try {
+        const res = await fetch('/api/me', {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        if (!res.ok) {
+          localStorage.removeItem('authToken');
+          return;
+        }
+        const data = await res.json();
+        setCurrentUser(data.user || null);
+      } catch {
+        localStorage.removeItem('authToken');
+      }
+    };
+
+    bootstrapAuth();
+  }, []);
+
+  useEffect(() => {
+    if (!currentUser || products.length === 0) return;
+
+    const syncUserState = async () => {
+      const token = typeof window !== 'undefined' ? localStorage.getItem('authToken') : null;
+      if (!token) return;
+
+      try {
+        const [cartRes, wishlistRes] = await Promise.all([
+          fetch('/api/cart', { headers: { Authorization: `Bearer ${token}` } }),
+          fetch('/api/wishlist', { headers: { Authorization: `Bearer ${token}` } })
+        ]);
+
+        if (cartRes.ok) {
+          const cartData = await cartRes.json();
+          const cartProducts = (cartData.cart?.products || []).map((entry: { productId: string; quantity: number }) => {
+            const p: any = products.find((x: any) => x.id === entry.productId || x._id === entry.productId);
+            if (!p) return null;
+            const price = p.price || parseFloat(p.priceRange?.minVariantPrice?.amount || '0');
+            const mrp = p.mrp || parseFloat(p.priceRange?.maxVariantPrice?.amount || '0') || price * 1.3;
+            const vol = p.vol || p.variants?.[0]?.title || 'Standard';
+            return {
+              id: p.id,
+              title: p.title,
+              icon: p.icon || CATEGORY_ICON[p.tags?.[0]] || '🧴',
+              price,
+              mrp,
+              tags: p.tags || [],
+              vol,
+              rating: p.rating || 4.5,
+              ratingCount: p.ratingCount || 120,
+              badge: p.badge,
+              qty: entry.quantity,
+            } as CartItem;
+          }).filter(Boolean) as CartItem[];
+          setCart(cartProducts);
+        }
+
+        if (wishlistRes.ok) {
+          const wishlistData = await wishlistRes.json();
+          const wishlistProducts = (wishlistData.wishlist?.products || []).map((productId: string) => {
+            const p: any = products.find((x: any) => x.id === productId || x._id === productId);
+            if (!p) return null;
+            const price = p.price || parseFloat(p.priceRange?.minVariantPrice?.amount || '0');
+            const mrp = p.mrp || parseFloat(p.priceRange?.maxVariantPrice?.amount || '0') || price * 1.3;
+            const vol = p.vol || p.variants?.[0]?.title || 'Standard';
+            return {
+              id: p.id,
+              title: p.title,
+              icon: p.icon || CATEGORY_ICON[p.tags?.[0]] || '🧴',
+              price,
+              mrp,
+              tags: p.tags || [],
+              vol,
+              rating: p.rating || 4.5,
+              ratingCount: p.ratingCount || 120,
+              badge: p.badge,
+            } as Product;
+          }).filter(Boolean) as Product[];
+          setWishlist(wishlistProducts);
+        }
+      } catch {
+        showToast('Could not sync cart/wishlist', 'error');
+      }
+    };
+
+    syncUserState();
+  }, [currentUser, products]);
 
   const fetchProducts = async (category: string, query: string) => {
     setLoading(true);
@@ -112,24 +207,152 @@ export default function FreshGuardStore({ initialCategory = 'all', hideHero = fa
     fetchProducts(activeCategory, q);
   };
 
+  const requireLogin = (product?: Product, type?: 'cart' | 'wishlist') => {
+    showToast('Please login to continue', 'error');
+    if (product && type) {
+      setPendingAction({ type, product });
+    }
+    setAuthOpen(true);
+    return false;
+  };
+
+  const getAuthToken = () => (typeof window !== 'undefined' ? localStorage.getItem('authToken') : null);
+
+  const handleAuthSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!authForm.email || !authForm.password || (authMode === 'signup' && !authForm.name)) {
+      showToast('Please fill all required fields', 'error');
+      return;
+    }
+
+    setAuthLoading(true);
+    try {
+      const endpoint = authMode === 'login' ? '/api/login' : '/api/register';
+      const res = await fetch(endpoint, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: authForm.name,
+          email: authForm.email,
+          password: authForm.password
+        })
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        showToast(data.error || 'Authentication failed', 'error');
+        return;
+      }
+
+      localStorage.setItem('authToken', data.token);
+      setCurrentUser(data.user);
+      setAuthOpen(false);
+      setAuthForm({ name: '', email: '', password: '' });
+      showToast(authMode === 'login' ? 'Login successful' : 'Account created successfully');
+
+      if (pendingAction) {
+        if (pendingAction.type === 'cart') {
+          await addToCart(pendingAction.product);
+        } else {
+          await toggleWishlist(pendingAction.product);
+        }
+        setPendingAction(null);
+      }
+    } catch {
+      showToast('Authentication request failed', 'error');
+    } finally {
+      setAuthLoading(false);
+    }
+  };
+
+  const logout = () => {
+    localStorage.removeItem('authToken');
+    setCurrentUser(null);
+    setCart([]);
+    setWishlist([]);
+    setAuthOpen(false);
+    showToast('Logged out');
+  };
+
   // ── Cart ──
-  const addToCart = (p: Product) => {
+  const addToCart = async (p: Product) => {
+    if (!currentUser) {
+      return requireLogin(p, 'cart');
+    }
+
     setCart(prev => {
       const ex = prev.find(c => c.id === p.id);
       if (ex) return prev.map(c => c.id === p.id ? { ...c, qty: c.qty + 1 } : c);
       return [...prev, { ...p, qty: 1 }];
     });
+
+    const token = getAuthToken();
+    if (token) {
+      await fetch('/api/cart/add', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify({ productId: p.id, quantity: 1 })
+      });
+    }
+
     showToast(`${p.icon || '🛒'} ${p.title.split(' ').slice(0, 3).join(' ')} added!`);
   };
 
-  const changeQty = (id: string, delta: number) => {
+  const changeQty = async (id: string, delta: number) => {
+    if (!currentUser) {
+      showToast('Please login to continue', 'error');
+      return;
+    }
+
+    const target = cart.find(c => c.id === id);
+    if (!target) return;
+
     setCart(prev => {
       const updated = prev.map(c => c.id === id ? { ...c, qty: c.qty + delta } : c);
       return updated.filter(c => c.qty > 0);
     });
+
+    const token = getAuthToken();
+    if (!token) return;
+
+    if (delta > 0) {
+      await fetch('/api/cart/add', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify({ productId: id, quantity: delta })
+      });
+      return;
+    }
+
+    if (target.qty + delta <= 0) {
+      await fetch(`/api/cart/remove/${id}`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${token}` }
+      });
+    }
   };
 
-  const removeFromCart = (id: string) => setCart(prev => prev.filter(c => c.id !== id));
+  const removeFromCart = async (id: string) => {
+    if (!currentUser) {
+      showToast('Please login to continue', 'error');
+      return;
+    }
+
+    setCart(prev => prev.filter(c => c.id !== id));
+    const token = getAuthToken();
+    if (token) {
+      await fetch(`/api/cart/remove/${id}`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${token}` }
+      });
+    }
+  };
 
   const cartTotal = cart.reduce((a, c) => a + c.price * c.qty, 0);
   const cartQty = cart.reduce((a, c) => a + c.qty, 0);
@@ -138,13 +361,32 @@ export default function FreshGuardStore({ initialCategory = 'all', hideHero = fa
   const grandTotal = cartTotal + delivery - discount;
 
   // ── Wishlist ──
-  const toggleWishlist = (p: Product) => {
+  const toggleWishlist = async (p: Product) => {
+    if (!currentUser) {
+      return requireLogin(p, 'wishlist');
+    }
+
+    const token = getAuthToken();
+    if (!token) return;
+
     setWishlist(prev => {
       const exists = prev.find(x => x.id === p.id);
       if (exists) {
+        fetch(`/api/wishlist/remove/${p.id}`, {
+          method: 'DELETE',
+          headers: { Authorization: `Bearer ${token}` }
+        });
         showToast('Removed from wishlist', 'error');
         return prev.filter(x => x.id !== p.id);
       } else {
+        fetch('/api/wishlist/add', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`
+          },
+          body: JSON.stringify({ productId: p.id })
+        });
         showToast('Added to wishlist! ❤️');
         return [...prev, p];
       }
@@ -266,29 +508,36 @@ export default function FreshGuardStore({ initialCategory = 'all', hideHero = fa
                 <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
                 </svg>
-                Sign In
+                {currentUser ? currentUser.name.split(' ')[0] : 'Sign In'}
               </button>
 
               {authOpen && (
                 <div className="auth-card open">
-                  <div className="heading">{authMode === 'login' ? 'Log In' : 'Sign Up'}</div>
-                  <form className="form" onSubmit={(e) => { e.preventDefault(); showToast('Success!', 'success'); setAuthOpen(false); }}>
+                  <div className="heading">{currentUser ? 'Your Account' : authMode === 'login' ? 'Log In' : 'Sign Up'}</div>
+                  {currentUser ? (
+                    <div>
+                      <p style={{ marginBottom: 6, fontWeight: 700 }}>{currentUser.name}</p>
+                      <p style={{ marginBottom: 18, fontSize: 13, color: '#64748b' }}>{currentUser.email}</p>
+                      <button className="btn" type="button" onClick={logout}>Logout</button>
+                    </div>
+                  ) : (
+                  <form className="form" onSubmit={handleAuthSubmit}>
                     {authMode === 'signup' && (
                       <div className="input-field" style={{ marginBottom: 20 }}>
-                        <input type="text" id="card-name" required />
+                        <input type="text" id="card-name" required value={authForm.name} onChange={(e) => setAuthForm(prev => ({ ...prev, name: e.target.value }))} />
                         <label htmlFor="card-name">Full Name</label>
                       </div>
                     )}
                     <div className="input-field" style={{ marginBottom: 20 }}>
-                      <input type="text" id="card-email" required />
-                      <label htmlFor="card-email">Mobile Number or Email</label>
+                      <input type="email" id="card-email" required value={authForm.email} onChange={(e) => setAuthForm(prev => ({ ...prev, email: e.target.value }))} />
+                      <label htmlFor="card-email">Email</label>
                     </div>
                     <div className="input-field">
-                      <input type="password" id="card-password" required />
+                      <input type="password" id="card-password" required value={authForm.password} onChange={(e) => setAuthForm(prev => ({ ...prev, password: e.target.value }))} />
                       <label htmlFor="card-password">Password</label>
                     </div>
                     <div className="btn-container" style={{ marginTop: 24 }}>
-                      <button className="btn" type="submit">Submit</button>
+                      <button className="btn" type="submit" disabled={authLoading}>{authLoading ? 'Please wait...' : authMode === 'login' ? 'Login' : 'Create Account'}</button>
                     </div>
                     <div style={{ textAlign: 'center', fontSize: 13, marginTop: 16, color: '#64748b' }}>
                       {authMode === 'login' ? "Don't have an account? " : "Already have an account? "}
@@ -298,11 +547,12 @@ export default function FreshGuardStore({ initialCategory = 'all', hideHero = fa
                       </span>
                     </div>
                   </form>
+                  )}
                 </div>
               )}
             </div>
 
-            <button className="nav-btn wishlist-badge" onClick={() => setWishlistOpen(true)}>
+            <button className="nav-btn wishlist-badge" onClick={() => currentUser ? setWishlistOpen(true) : requireLogin()}>
               <div style={{ position: 'relative', display: 'inline-block' }}>
                 <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" width="22" height="22">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
@@ -311,7 +561,7 @@ export default function FreshGuardStore({ initialCategory = 'all', hideHero = fa
               </div>
               Wishlist
             </button>
-            <button className="nav-btn cart-badge" onClick={() => setCartOpen(true)}>
+            <button className="nav-btn cart-badge" onClick={() => currentUser ? setCartOpen(true) : requireLogin()}>
               <div style={{ position: 'relative', display: 'inline-block' }}>
                 <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" width="22" height="22">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" />
@@ -517,7 +767,7 @@ export default function FreshGuardStore({ initialCategory = 'all', hideHero = fa
                     </div>
                     <div className="prod-actions">
                       <button className="btn-cart" onClick={(e) => { e.stopPropagation(); addToCart(product); }}>🛒 Cart</button>
-                      <button className="btn-buy" onClick={(e) => { e.stopPropagation(); addToCart(product); setCartOpen(true); }}>⚡ Buy</button>
+                      <button className="btn-buy" onClick={(e) => { e.stopPropagation(); addToCart(product); if (currentUser) setCartOpen(true); }}>⚡ Buy</button>
                     </div>
                   </div>
                  );
@@ -756,7 +1006,7 @@ export default function FreshGuardStore({ initialCategory = 'all', hideHero = fa
                 <>
                   <button className="btn-back" onClick={() => setModalState('closed')}>← Back</button>
                   <button className="btn-next" style={{ background: 'var(--accent)' }} onClick={() => { addToCart(selectedProduct); setModalState('closed'); }}>🛒 Add to Cart</button>
-                  <button className="btn-next" onClick={() => { addToCart(selectedProduct); setModalState('checkout'); setCheckoutStep(1); setOrderPlaced(null); }}>⚡ Buy Now</button>
+                  <button className="btn-next" onClick={() => { addToCart(selectedProduct); if (currentUser) { setModalState('checkout'); setCheckoutStep(1); setOrderPlaced(null); } }}>⚡ Buy Now</button>
                 </>
               )}
               {modalState === 'checkout' && checkoutStep === 1 && (
