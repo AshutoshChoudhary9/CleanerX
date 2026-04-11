@@ -18,7 +18,7 @@ export async function DELETE(req: NextRequest, { params }: Params) {
     const wishlist = await Wishlist.findOneAndUpdate(
       { userId: user.userId },
       { $pull: { products: productId } },
-      { new: true }
+      { returnDocument: 'after' }
     ).lean();
 
     return NextResponse.json({ wishlist: wishlist || { userId: user.userId, products: [] } });

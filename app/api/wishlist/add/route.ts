@@ -18,10 +18,10 @@ export async function POST(req: NextRequest) {
     const wishlist = await Wishlist.findOneAndUpdate(
       { userId: user.userId },
       {
-        $setOnInsert: { userId: user.userId, products: [] },
+        $setOnInsert: { userId: user.userId },
         $addToSet: { products: productId }
       },
-      { new: true, upsert: true }
+      { returnDocument: 'after', upsert: true }
     ).lean();
 
     return NextResponse.json({ wishlist });

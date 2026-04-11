@@ -19,7 +19,7 @@ export async function POST(req: NextRequest) {
     const cart = await UserCart.findOneAndUpdate(
       { userId: user.userId },
       { $setOnInsert: { userId: user.userId, products: [] } },
-      { new: true, upsert: true }
+      { returnDocument: 'after', upsert: true }
     );
 
     const existing = cart.products.find((p) => p.productId === productId);

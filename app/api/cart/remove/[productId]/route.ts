@@ -18,7 +18,7 @@ export async function DELETE(req: NextRequest, { params }: Params) {
     const cart = await UserCart.findOneAndUpdate(
       { userId: user.userId },
       { $pull: { products: { productId } } },
-      { new: true }
+      { returnDocument: 'after' }
     ).lean();
 
     return NextResponse.json({ cart: cart || { userId: user.userId, products: [] } });

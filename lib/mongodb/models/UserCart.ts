@@ -22,7 +22,7 @@ const UserCartSchema: Schema = new Schema(
       }
     ]
   },
-  { timestamps: true, collection: 'carts' }
+  { timestamps: true, collection: 'user_carts' }
 );
 
 export default mongoose.models.UserCart || mongoose.model<IUserCart>('UserCart', UserCartSchema);
