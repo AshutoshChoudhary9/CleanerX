@@ -12,7 +12,10 @@ export default async function SearchPage(props: {
   searchParams?: Promise<{ [key: string]: string | string[] | undefined }>;
 }) {
   const searchParams = await props.searchParams;
-  const { sort, q: searchValue } = searchParams as { [key: string]: string };
+  const sort = typeof searchParams?.sort === 'string' ? searchParams.sort : undefined;
+  const q = typeof searchParams?.q === 'string' ? searchParams.q : undefined;
+  const searchValue = q;
+
   const { sortKey, reverse } =
     sorting.find((item) => item.slug === sort) || defaultSort;
 

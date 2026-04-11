@@ -1,11 +1,9 @@
-import connectToDatabase from './db';
-import Product from './models/Product';
-import Collection from './models/Collection';
-import CartModel from './models/Cart';
-import { Cart, Product as ProductType, Collection as CollectionType, Menu } from 'lib/shopify/types';
+import { Cart, Collection as CollectionType, Menu, Product as ProductType } from 'lib/shopify/types';
 import { cookies } from 'next/headers';
-import { TAGS } from 'lib/constants';
-import { unstable_cacheLife as cacheLife, unstable_cacheTag as cacheTag } from 'next/cache';
+import connectToDatabase from './db';
+import CartModel from './models/Cart';
+import Collection from './models/Collection';
+import Product from './models/Product';
 
 export async function getProducts({ query, reverse, sortKey }: { query?: string; reverse?: boolean; sortKey?: string }): Promise<ProductType[]> {
   await connectToDatabase();
@@ -13,12 +11,12 @@ export async function getProducts({ query, reverse, sortKey }: { query?: string;
   if (query) {
     filter = { $or: [{ title: new RegExp(query, 'i') }, { tags: new RegExp(query, 'i') }] };
   }
-  
+
   let sort: any = {};
-  if (sortKey === 'PRICE') sort.priceRange = reverse ? -1 : 1;
+  if (sortKey === 'PRICE') sort['priceRange.minVariantPrice.amount'] = reverse ? -1 : 1;
   else if (sortKey === 'CREATED_AT') sort.createdAt = reverse ? -1 : 1;
-  
-  const products = await Product.find(filter).sort(sort).lean();
+
+  const products = await Product.find(filter).collation({ locale: 'en_US', numericOrdering: true }).sort(sort).lean();
   return products.map(p => ({
     ...p,
     id: p._id.toString(),
@@ -79,10 +77,7 @@ export async function getMenu(handle: string): Promise<Menu[]> {
 }
 
 // Cart Logic
-export async function getCart(): Promise<Cart | undefined> {
-  const cartId = (await cookies()).get('cartId')?.value;
-  if (!cartId) return undefined;
-
+export async function getCartById(cartId: string): Promise<Cart | undefined> {
   await connectToDatabase();
   const cartDoc = await CartModel.findOne({ cartId }).lean();
   if (!cartDoc) return undefined;
@@ -94,7 +89,8 @@ export async function getCart(): Promise<Cart | undefined> {
     if (!product) return null;
 
     const variant = product.variants.find((v: any) => v.id === item.merchandiseId);
-    
+    if (!variant) return null;
+
     return {
       id: item.id,
       quantity: item.quantity,
@@ -135,15 +131,21 @@ export async function getCart(): Promise<Cart | undefined> {
   } as unknown as Cart;
 }
 
+export async function getCart(): Promise<Cart | undefined> {
+  const cartId = (await cookies()).get('cartId')?.value;
+  if (!cartId) return undefined;
+  return getCartById(cartId);
+}
+
 export async function createCart(): Promise<Cart> {
   const cartId = Math.random().toString(36).substring(7);
   await connectToDatabase();
   const cart = new CartModel({ cartId, items: [] });
   await cart.save();
-  
+
   // Set cookie (this usually happens in a server action or middleware in this template)
   // For now we'll just return the cart object. The template handles setting the cookie.
-  
+
   return {
     id: cartId,
     checkoutUrl: '',
@@ -158,12 +160,15 @@ export async function createCart(): Promise<Cart> {
 }
 
 export async function addToCart(lines: { merchandiseId: string; quantity: number }[]): Promise<Cart> {
-  const cartId = (await cookies()).get('cartId')?.value;
-  if (!cartId) return createCart();
+  let cartId = (await cookies()).get('cartId')?.value;
 
   await connectToDatabase();
-  const cart = await CartModel.findOne({ cartId });
-  if (!cart) return createCart();
+  let cart = cartId ? await CartModel.findOne({ cartId }) : null;
+
+  if (!cart) {
+    cartId = Math.random().toString(36).substring(7);
+    cart = new CartModel({ cartId, items: [] });
+  }
 
   for (const line of lines) {
     const existingIndex = cart.items.findIndex((item: any) => item.merchandiseId === line.merchandiseId);
@@ -174,8 +179,9 @@ export async function addToCart(lines: { merchandiseId: string; quantity: number
     }
   }
 
+  cart.markModified('items');
   await cart.save();
-  return getCart() as Promise<Cart>;
+  return (await getCartById(cartId as string)) as Cart;
 }
 
 export async function removeFromCart(lineIds: string[]): Promise<Cart> {
@@ -188,7 +194,7 @@ export async function removeFromCart(lineIds: string[]): Promise<Cart> {
 
   cart.items = cart.items.filter((item: any) => !lineIds.includes(item.id));
   await cart.save();
-  return getCart() as Promise<Cart>;
+  return (await getCartById(cartId)) as Cart;
 }
 
 export async function updateCart(lines: { id: string; merchandiseId: string; quantity: number }[]): Promise<Cart> {
@@ -210,8 +216,9 @@ export async function updateCart(lines: { id: string; merchandiseId: string; qua
     }
   }
 
+  cart.markModified('items');
   await cart.save();
-  return getCart() as Promise<Cart>;
+  return (await getCartById(cartId)) as Cart;
 }
 
 export async function getPage(handle: string) {

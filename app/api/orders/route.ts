@@ -34,8 +34,13 @@ export async function PATCH(req: NextRequest) {
   try {
     await connectToDatabase();
     const body = await req.json();
-    const { id, status } = body;
-    const order = await Order.findByIdAndUpdate(id, { paymentStatus: status }, { new: true });
+    const { id, orderId, status, razorpayPaymentId } = body;
+    
+    const query = id ? { _id: id } : { orderId: orderId };
+    const update: any = { paymentStatus: status };
+    if (razorpayPaymentId) update.razorpayPaymentId = razorpayPaymentId;
+
+    const order = await Order.findOneAndUpdate(query, update, { new: true });
     return NextResponse.json({ success: true, order });
   } catch (err) {
     console.error('Update Order Error:', err);

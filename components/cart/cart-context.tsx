@@ -18,13 +18,13 @@ type UpdateType = "plus" | "minus" | "delete";
 
 type CartAction =
   | {
-      type: "UPDATE_ITEM";
-      payload: { merchandiseId: string; updateType: UpdateType };
-    }
+    type: "UPDATE_ITEM";
+    payload: { merchandiseId: string; updateType: UpdateType };
+  }
   | {
-      type: "ADD_ITEM";
-      payload: { variant: ProductVariant; product: Product };
-    };
+    type: "ADD_ITEM";
+    payload: { variant: ProductVariant; product: Product };
+  };
 
 type CartContextType = {
   cartPromise: Promise<Cart | undefined>;
@@ -33,7 +33,7 @@ type CartContextType = {
 const CartContext = createContext<CartContextType | undefined>(undefined);
 
 function calculateItemCost(quantity: number, price: string): string {
-  return (Number(price) * quantity).toString();
+  return (Number(price) * quantity).toFixed(2);
 }
 
 function updateCartItem(
@@ -109,8 +109,8 @@ function updateCartTotals(
   return {
     totalQuantity,
     cost: {
-      subtotalAmount: { amount: totalAmount.toString(), currencyCode },
-      totalAmount: { amount: totalAmount.toString(), currencyCode },
+      subtotalAmount: { amount: totalAmount.toFixed(2), currencyCode },
+      totalAmount: { amount: totalAmount.toFixed(2), currencyCode },
       totalTaxAmount: { amount: "0", currencyCode },
     },
   };
@@ -175,8 +175,8 @@ function cartReducer(state: Cart | undefined, action: CartAction): Cart {
 
       const updatedLines = existingItem
         ? currentCart.lines.map((item) =>
-            item.merchandise.id === variant.id ? updatedItem : item,
-          )
+          item.merchandise.id === variant.id ? updatedItem : item,
+        )
         : [...currentCart.lines, updatedItem];
 
       return {

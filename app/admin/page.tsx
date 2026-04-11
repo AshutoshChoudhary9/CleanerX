@@ -48,19 +48,20 @@ export default function AdminDashboard() {
     }
   };
 
-  const handleUpdateProduct = async (e: React.FormEvent) => {
+  const handleUpdateProduct = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (!editingProduct) return;
+    const formData = new FormData(e.currentTarget);
     try {
       const res = await fetch('/api/products', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           id: editingProduct.id,
-          title: (e.target as any)[0].value,
-          price: (e.target as any)[1].value,
-          mrp: (e.target as any)[2].value,
-          tags: (e.target as any)[3].value,
+          title: formData.get('title'),
+          price: formData.get('price'),
+          mrp: formData.get('mrp'),
+          tags: formData.get('tags'),
         })
       });
       if (res.ok) {
@@ -234,9 +235,22 @@ export default function AdminDashboard() {
           <div className="modal-content">
             <h3>Edit Product: {editingProduct.title}</h3>
             <form onSubmit={handleUpdateProduct}>
-              <div className="field"><label>Price (₹)</label><input type="number" defaultValue={editingProduct.price || editingProduct.priceRange?.minVariantPrice?.amount} /></div>
-              <div className="field"><label>MRP (₹)</label><input type="number" defaultValue={editingProduct.mrp || editingProduct.priceRange?.maxVariantPrice?.amount} /></div>
-              <div className="field"><label>Category Tag</label><input type="text" defaultValue={editingProduct.tags?.[0]} /></div>
+              <div className="field">
+                <label>Title</label>
+                <input type="text" name="title" defaultValue={editingProduct.title} required />
+              </div>
+              <div className="field">
+                <label>Price (₹)</label>
+                <input type="number" name="price" defaultValue={editingProduct.price || editingProduct.priceRange?.minVariantPrice?.amount} required />
+              </div>
+              <div className="field">
+                <label>MRP (₹)</label>
+                <input type="number" name="mrp" defaultValue={editingProduct.mrp || editingProduct.priceRange?.maxVariantPrice?.amount} required />
+              </div>
+              <div className="field">
+                <label>Category Tag</label>
+                <input type="text" name="tags" defaultValue={editingProduct.tags?.[0]} required />
+              </div>
               <div className="modal-actions">
                 <button type="button" onClick={() => setEditingProduct(null)}>Cancel</button>
                 <button type="submit" className="btn-save">Save Changes</button>

@@ -1,6 +1,6 @@
-import { NextRequest, NextResponse } from 'next/server';
 import connectToDatabase from 'lib/mongodb/db';
 import Product from 'lib/mongodb/models/Product';
+import { NextRequest, NextResponse } from 'next/server';
 
 export async function GET(req: NextRequest) {
   try {
@@ -9,29 +9,37 @@ export async function GET(req: NextRequest) {
     const query = searchParams.get('query') || '';
     const category = searchParams.get('category') || '';
 
+    const escapeRegex = (string: string) => {
+      return string.replace(/[/\-\\^$*+?.()|[\]{}]/g, '\\$&');
+    };
+
     let filter: any = {};
     if (query) {
+      const escapedQuery = escapeRegex(query);
       filter.$or = [
-        { title: new RegExp(query, 'i') },
-        { tags: new RegExp(query, 'i') },
+        { title: new RegExp(escapedQuery, 'i') },
+        { tags: new RegExp(escapedQuery, 'i') },
       ];
     }
     if (category && category !== 'all') {
-      filter.tags = { $regex: category, $options: 'i' };
+      const escapedCategory = escapeRegex(category);
+      filter.tags = { $regex: escapedCategory, $options: 'i' };
     }
 
     const products = await Product.find(filter).lean();
 
-    // If no products in DB, return static seed data
-    if (!products.length) {
+    // If no products in DB and no filter applied, return static seed data
+    if (!products.length && !query && (!category || category === 'all')) {
       return NextResponse.json({ products: SEED_PRODUCTS });
     }
 
-    return NextResponse.json({ products: products.map(p => ({
-      ...p,
-      id: p._id.toString(),
-      _id: p._id.toString(),
-    })) });
+    return NextResponse.json({
+      products: products.map(p => ({
+        ...p,
+        id: p._id.toString(),
+        _id: p._id.toString(),
+      }))
+    });
   } catch (err) {
     console.error('Products API Error:', err);
     return NextResponse.json({ products: SEED_PRODUCTS });
@@ -44,7 +52,7 @@ export async function POST(req: NextRequest) {
     const body = await req.json();
     const { name, price, mrp, volume, category, fragrance, description } = body;
 
-    if (!name || !price) {
+    if (!name || price === undefined) {
       return NextResponse.json({ error: 'Name and price are required' }, { status: 400 });
     }
 
@@ -89,14 +97,14 @@ export async function PUT(req: NextRequest) {
     await connectToDatabase();
     const body = await req.json();
     const { id, price, mrp, tags, title } = body;
-    
+
     const update: any = {};
     if (title) update.title = title;
-    if (price) {
+    if (price !== undefined) {
       update['priceRange.minVariantPrice.amount'] = price.toString();
       update['variants.0.price.amount'] = price.toString();
     }
-    if (mrp) {
+    if (mrp !== undefined) {
       update['priceRange.maxVariantPrice.amount'] = mrp.toString();
     }
     if (tags) update.tags = Array.isArray(tags) ? tags : [tags];
@@ -125,16 +133,16 @@ export async function DELETE(req: NextRequest) {
 
 // Static seed data when DB is empty
 const SEED_PRODUCTS = [
-  { id:'1', title:'FreshGuard Classic Floor Cleaner', icon:'🧴', price:149, mrp:199, tags:['floor'], vol:'1 Litre', rating:4.5, ratingCount:2341, badge:'Best Seller' },
-  { id:'2', title:'FreshGuard Lavender Floor Liquid', icon:'💜', price:169, mrp:229, tags:['floor'], vol:'2 Litre', rating:4.3, ratingCount:1892, badge:'Top Rated' },
-  { id:'3', title:'FreshGuard Pine Fresh Concentrate', icon:'🌲', price:129, mrp:179, tags:['floor'], vol:'500 ml', rating:4.6, ratingCount:876, badge:'New' },
-  { id:'4', title:'FreshGuard Lemon Burst Disinfectant', icon:'🍋', price:189, mrp:259, tags:['floor'], vol:'5 Litre', rating:4.4, ratingCount:1203, badge:'Hot' },
-  { id:'5', title:'FreshGuard HyperClean Toilet Gel', icon:'🚽', price:129, mrp:169, tags:['toilet'], vol:'750 ml', rating:4.7, ratingCount:3421, badge:'Best Seller' },
-  { id:'6', title:'FreshGuard Thick Foam Toilet Cleaner', icon:'🧼', price:149, mrp:199, tags:['toilet'], vol:'1 Litre', rating:4.2, ratingCount:987, badge:'Hot' },
-  { id:'7', title:'FreshGuard Ocean Fresh Toilet Gel', icon:'🌊', price:119, mrp:159, tags:['toilet'], vol:'500 ml', rating:4.5, ratingCount:654, badge:'New' },
-  { id:'8', title:'FreshGuard Pro Toilet Disinfectant', icon:'⚗️', price:199, mrp:279, tags:['toilet'], vol:'1.5 Litre', rating:4.8, ratingCount:2109, badge:'Top Rated' },
-  { id:'9', title:'FreshGuard ClearView Glass Spray', icon:'🪟', price:119, mrp:159, tags:['glass'], vol:'500 ml', rating:4.6, ratingCount:1876, badge:'Best Seller' },
-  { id:'10', title:'FreshGuard Streak-Free Mirror Cleaner', icon:'🪞', price:139, mrp:189, tags:['glass'], vol:'750 ml', rating:4.4, ratingCount:1234, badge:'Top Rated' },
-  { id:'11', title:'FreshGuard Anti-Fog Glass Protector', icon:'🔭', price:179, mrp:239, tags:['glass'], vol:'500 ml', rating:4.3, ratingCount:567, badge:'New' },
-  { id:'12', title:'FreshGuard Ultra Shine Glass Liquid', icon:'✨', price:159, mrp:219, tags:['glass'], vol:'1 Litre', rating:4.5, ratingCount:2341, badge:'Hot' },
+  { id: '1', title: 'FreshGuard Classic Floor Cleaner', icon: '🧴', price: 149, mrp: 199, tags: ['floor'], vol: '1 Litre', rating: 4.5, ratingCount: 2341, badge: 'Best Seller' },
+  { id: '2', title: 'FreshGuard Lavender Floor Liquid', icon: '💜', price: 169, mrp: 229, tags: ['floor'], vol: '2 Litre', rating: 4.3, ratingCount: 1892, badge: 'Top Rated' },
+  { id: '3', title: 'FreshGuard Pine Fresh Concentrate', icon: '🌲', price: 129, mrp: 179, tags: ['floor'], vol: '500 ml', rating: 4.6, ratingCount: 876, badge: 'New' },
+  { id: '4', title: 'FreshGuard Lemon Burst Disinfectant', icon: '🍋', price: 189, mrp: 259, tags: ['floor'], vol: '5 Litre', rating: 4.4, ratingCount: 1203, badge: 'Hot' },
+  { id: '5', title: 'FreshGuard HyperClean Toilet Gel', icon: '🚽', price: 129, mrp: 169, tags: ['toilet'], vol: '750 ml', rating: 4.7, ratingCount: 3421, badge: 'Best Seller' },
+  { id: '6', title: 'FreshGuard Thick Foam Toilet Cleaner', icon: '🧼', price: 149, mrp: 199, tags: ['toilet'], vol: '1 Litre', rating: 4.2, ratingCount: 987, badge: 'Hot' },
+  { id: '7', title: 'FreshGuard Ocean Fresh Toilet Gel', icon: '🌊', price: 119, mrp: 159, tags: ['toilet'], vol: '500 ml', rating: 4.5, ratingCount: 654, badge: 'New' },
+  { id: '8', title: 'FreshGuard Pro Toilet Disinfectant', icon: '⚗️', price: 199, mrp: 279, tags: ['toilet'], vol: '1.5 Litre', rating: 4.8, ratingCount: 2109, badge: 'Top Rated' },
+  { id: '9', title: 'FreshGuard ClearView Glass Spray', icon: '🪟', price: 119, mrp: 159, tags: ['glass'], vol: '500 ml', rating: 4.6, ratingCount: 1876, badge: 'Best Seller' },
+  { id: '10', title: 'FreshGuard Streak-Free Mirror Cleaner', icon: '🪞', price: 139, mrp: 189, tags: ['glass'], vol: '750 ml', rating: 4.4, ratingCount: 1234, badge: 'Top Rated' },
+  { id: '11', title: 'FreshGuard Anti-Fog Glass Protector', icon: '🔭', price: 179, mrp: 239, tags: ['glass'], vol: '500 ml', rating: 4.3, ratingCount: 567, badge: 'New' },
+  { id: '12', title: 'FreshGuard Ultra Shine Glass Liquid', icon: '✨', price: 159, mrp: 219, tags: ['glass'], vol: '1 Litre', rating: 4.5, ratingCount: 2341, badge: 'Hot' },
 ];

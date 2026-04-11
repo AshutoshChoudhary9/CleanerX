@@ -117,9 +117,7 @@ export default function FreshGuardStore({ initialCategory = 'all', hideHero = fa
 
         if (cartRes.ok) {
           const cartData = await cartRes.json();
-          const cartProducts = (cartData.cart?.products || []).map((entry: { productId: string; quantity: number }) => {
-            const p: any = products.find((x: any) => x.id === entry.productId || x._id === entry.productId);
-            if (!p) return null;
+          const cartProducts = (cartData.cart?.products || []).map((p: any) => {
             const price = p.price || parseFloat(p.priceRange?.minVariantPrice?.amount || '0');
             const mrp = p.mrp || parseFloat(p.priceRange?.maxVariantPrice?.amount || '0') || price * 1.3;
             const vol = p.vol || p.variants?.[0]?.title || 'Standard';
@@ -134,17 +132,15 @@ export default function FreshGuardStore({ initialCategory = 'all', hideHero = fa
               rating: p.rating || 4.5,
               ratingCount: p.ratingCount || 120,
               badge: p.badge,
-              qty: entry.quantity,
+              qty: p.qty,
             } as CartItem;
-          }).filter(Boolean) as CartItem[];
+          });
           setCart(cartProducts);
         }
 
         if (wishlistRes.ok) {
           const wishlistData = await wishlistRes.json();
-          const wishlistProducts = (wishlistData.wishlist?.products || []).map((productId: string) => {
-            const p: any = products.find((x: any) => x.id === productId || x._id === productId);
-            if (!p) return null;
+          const wishlistProducts = (wishlistData.wishlist?.products || []).map((p: any) => {
             const price = p.price || parseFloat(p.priceRange?.minVariantPrice?.amount || '0');
             const mrp = p.mrp || parseFloat(p.priceRange?.maxVariantPrice?.amount || '0') || price * 1.3;
             const vol = p.vol || p.variants?.[0]?.title || 'Standard';
@@ -160,7 +156,7 @@ export default function FreshGuardStore({ initialCategory = 'all', hideHero = fa
               ratingCount: p.ratingCount || 120,
               badge: p.badge,
             } as Product;
-          }).filter(Boolean) as Product[];
+          });
           setWishlist(wishlistProducts);
         }
       } catch {
@@ -202,9 +198,16 @@ export default function FreshGuardStore({ initialCategory = 'all', hideHero = fa
     setTimeout(() => setToasts(t => t.filter(x => x.id !== id)), 3000);
   };
 
+  useEffect(() => {
+    if (searchQuery === '') return;
+    const delayDebounceFn = setTimeout(() => {
+      fetchProducts(activeCategory, searchQuery);
+    }, 500);
+    return () => clearTimeout(delayDebounceFn);
+  }, [searchQuery, activeCategory]);
+
   const handleSearch = (q: string) => {
     setSearchQuery(q);
-    fetchProducts(activeCategory, q);
   };
 
   const requireLogin = (product?: Product, type?: 'cart' | 'wishlist') => {
@@ -287,19 +290,30 @@ export default function FreshGuardStore({ initialCategory = 'all', hideHero = fa
       return [...prev, { ...p, qty: 1 }];
     });
 
-    const token = getAuthToken();
-    if (token) {
-      await fetch('/api/cart/add', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`
-        },
-        body: JSON.stringify({ productId: p.id, quantity: 1 })
+    try {
+      const token = getAuthToken();
+      if (token) {
+        const res = await fetch('/api/cart/add', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`
+          },
+          body: JSON.stringify({ productId: p.id, quantity: 1 })
+        });
+        if (!res.ok) throw new Error('Failed to sync cart');
+      }
+      showToast(`${p.icon || '🛒'} ${p.title.split(' ').slice(0, 3).join(' ')} added!`);
+    } catch (err) {
+      console.error(err);
+      showToast('Error saving to cart', 'error');
+      // Rollback local state
+      setCart(prev => {
+        const target = prev.find(c => c.id === p.id);
+        if (target && target.qty > 1) return prev.map(c => c.id === p.id ? { ...c, qty: c.qty - 1 } : c);
+        return prev.filter(c => c.id !== p.id);
       });
     }
-
-    showToast(`${p.icon || '🛒'} ${p.title.split(' ').slice(0, 3).join(' ')} added!`);
   };
 
   const changeQty = async (id: string, delta: number) => {
@@ -407,6 +421,26 @@ export default function FreshGuardStore({ initialCategory = 'all', hideHero = fa
       const data = await res.json();
 
       if (data.orderId && typeof window !== 'undefined' && (window as any).Razorpay) {
+        // Pre-save order as pending
+        await fetch('/api/orders', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            orderId: data.orderId,
+            customerName: checkoutForm.name,
+            mobile: checkoutForm.mobile,
+            address: checkoutForm.address,
+            city: checkoutForm.city,
+            pincode: checkoutForm.pincode,
+            state: checkoutForm.state,
+            items: cart,
+            totalAmount: grandTotal,
+            paymentMethod: selectedPayment,
+            paymentStatus: 'pending',
+            razorpayOrderId: data.orderId
+          })
+        });
+
         const rzp = new (window as any).Razorpay({
           key: data.keyId,
           amount: data.amount,
@@ -416,23 +450,13 @@ export default function FreshGuardStore({ initialCategory = 'all', hideHero = fa
           description: 'Cleaning Products Order',
           theme: { color: '#0a6ebd' },
           handler: async (response: any) => {
-            // Save order to DB
+            // Update order to paid
             await fetch('/api/orders', {
-              method: 'POST',
+              method: 'PATCH',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({
                 orderId: response.razorpay_order_id,
-                customerName: checkoutForm.name,
-                mobile: checkoutForm.mobile,
-                address: checkoutForm.address,
-                city: checkoutForm.city,
-                pincode: checkoutForm.pincode,
-                state: checkoutForm.state,
-                items: cart,
-                totalAmount: grandTotal,
-                paymentMethod: selectedPayment,
-                paymentStatus: 'paid',
-                razorpayOrderId: response.razorpay_order_id,
+                status: 'paid',
                 razorpayPaymentId: response.razorpay_payment_id
               })
             });
@@ -447,7 +471,7 @@ export default function FreshGuardStore({ initialCategory = 'all', hideHero = fa
         rzp.open();
       } else {
         const orderId = `FG${Date.now().toString().slice(-8)}`;
-        // Save order as pending/COD
+        // Save order as pending/paid for non-Razorpay (COD)
         await fetch('/api/orders', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
