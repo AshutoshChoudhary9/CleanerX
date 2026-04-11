@@ -84,6 +84,45 @@ export async function POST(req: NextRequest) {
   }
 }
 
+export async function PUT(req: NextRequest) {
+  try {
+    await connectToDatabase();
+    const body = await req.json();
+    const { id, price, mrp, tags, title } = body;
+    
+    const update: any = {};
+    if (title) update.title = title;
+    if (price) {
+      update['priceRange.minVariantPrice.amount'] = price.toString();
+      update['variants.0.price.amount'] = price.toString();
+    }
+    if (mrp) {
+      update['priceRange.maxVariantPrice.amount'] = mrp.toString();
+    }
+    if (tags) update.tags = Array.isArray(tags) ? tags : [tags];
+
+    const product = await Product.findByIdAndUpdate(id, { $set: update }, { new: true });
+    return NextResponse.json({ success: true, product });
+  } catch (err) {
+    console.error('Update Product Error:', err);
+    return NextResponse.json({ error: 'Failed to update product' }, { status: 500 });
+  }
+}
+
+export async function DELETE(req: NextRequest) {
+  try {
+    await connectToDatabase();
+    const { searchParams } = new URL(req.url);
+    const id = searchParams.get('id');
+    if (!id) return NextResponse.json({ error: 'ID required' }, { status: 400 });
+    await Product.findByIdAndDelete(id);
+    return NextResponse.json({ success: true });
+  } catch (err) {
+    console.error('Delete Product Error:', err);
+    return NextResponse.json({ error: 'Failed to delete product' }, { status: 500 });
+  }
+}
+
 // Static seed data when DB is empty
 const SEED_PRODUCTS = [
   { id:'1', title:'FreshGuard Classic Floor Cleaner', icon:'🧴', price:149, mrp:199, tags:['floor'], vol:'1 Litre', rating:4.5, ratingCount:2341, badge:'Best Seller' },
