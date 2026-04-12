@@ -16,10 +16,10 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'productId is required' }, { status: 400 });
     }
 
-    // Atomic update to prevent race conditions
+    // Atomic update to allow both increment and decrement
     let cart = await UserCart.findOneAndUpdate(
       { userId: user.userId, 'products.productId': productId },
-      { $inc: { 'products.$.quantity': Math.max(1, quantity) } },
+      { $inc: { 'products.$.quantity': quantity } },
       { new: true }
     );
 

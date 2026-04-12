@@ -333,7 +333,7 @@ export default function FreshGuardStore({ initialCategory = 'all', hideHero = fa
     const token = getAuthToken();
     if (!token) return;
 
-    if (delta > 0) {
+    if (delta > 0 || (target.qty + delta > 0)) {
       await fetch('/api/cart/add', {
         method: 'POST',
         headers: {
@@ -342,7 +342,6 @@ export default function FreshGuardStore({ initialCategory = 'all', hideHero = fa
         },
         body: JSON.stringify({ productId: id, quantity: delta })
       });
-      return;
     }
 
     if (target.qty + delta <= 0) {
@@ -373,7 +372,7 @@ export default function FreshGuardStore({ initialCategory = 'all', hideHero = fa
   const cartQty = cart.reduce((a, c) => a + c.qty, 0);
   const delivery = cartTotal >= 299 || cartTotal === 0 ? 0 : 49;
   const discount = (cartTotal >= 299 && cartTotal > 0) ? 49 : 0;
-  const grandTotal = Math.max(0, Math.round((cartTotal + delivery - discount) * 100) / 100);
+  const grandTotal = Math.max(0, Math.round((cartTotal + delivery - discount + (selectedPayment === 'cod' ? 49 : 0)) * 100) / 100);
 
   // ── Wishlist ──
   const toggleWishlist = async (p: Product) => {
@@ -875,7 +874,14 @@ export default function FreshGuardStore({ initialCategory = 'all', hideHero = fa
         </div>
         {wishlist.length > 0 && (
           <div className="cart-footer">
-            <button className="checkout-btn" style={{ background: 'var(--primary)' }} onClick={() => { wishlist.forEach(item => addToCart(item)); setWishlist([]); setWishlistOpen(false); showToast('All items added to cart!'); }}>🛒 Add All to Cart →</button>
+            <button className="checkout-btn" style={{ background: 'var(--primary)' }} onClick={() => { 
+                wishlist.forEach(item => {
+                  addToCart(item);
+                  toggleWishlist(item); // This will handle DB removal
+                });
+                setWishlistOpen(false); 
+                showToast('All items added to cart!'); 
+              }}>🛒 Add All to Cart →</button>
           </div>
         )}
       </div>
