@@ -16,20 +16,25 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'productId is required' }, { status: 400 });
     }
 
-    const cart = await UserCart.findOneAndUpdate(
-      { userId: user.userId },
-      { $setOnInsert: { userId: user.userId, products: [] } },
-      { returnDocument: 'after', upsert: true }
+    // Atomic update to prevent race conditions
+    let cart = await UserCart.findOneAndUpdate(
+      { userId: user.userId, 'products.productId': productId },
+      { $inc: { 'products.$.quantity': Math.max(1, quantity) } },
+      { new: true }
     );
 
-    const existing = cart.products.find((p) => p.productId === productId);
-    if (existing) {
-      existing.quantity += Math.max(1, quantity);
-    } else {
-      cart.products.push({ productId, quantity: Math.max(1, quantity) });
+    if (!cart) {
+      // Product not in cart, push new item
+      cart = await UserCart.findOneAndUpdate(
+        { userId: user.userId },
+        { 
+          $push: { products: { productId, quantity: Math.max(1, quantity) } },
+          $setOnInsert: { userId: user.userId }
+        },
+        { upsert: true, new: true }
+      );
     }
 
-    await cart.save();
     return NextResponse.json({ cart });
   } catch (err) {
     console.error('Cart Add API Error:', err);

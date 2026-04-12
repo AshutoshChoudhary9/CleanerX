@@ -96,7 +96,7 @@ export async function PUT(req: NextRequest) {
   try {
     await connectToDatabase();
     const body = await req.json();
-    const { id, price, mrp, tags, title } = body;
+    const { id, price, mrp, tags, title, vol } = body;
 
     const update: any = {};
     if (title) update.title = title;
@@ -108,6 +108,10 @@ export async function PUT(req: NextRequest) {
       update['priceRange.maxVariantPrice.amount'] = mrp.toString();
     }
     if (tags) update.tags = Array.isArray(tags) ? tags : [tags];
+    if (vol) {
+      update['variants.0.title'] = vol;
+      update['variants.0.selectedOptions.0.value'] = vol;
+    }
 
     const product = await Product.findByIdAndUpdate(id, { $set: update }, { new: true });
     return NextResponse.json({ success: true, product });

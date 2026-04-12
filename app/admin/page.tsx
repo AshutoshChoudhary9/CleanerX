@@ -62,6 +62,7 @@ export default function AdminDashboard() {
           price: formData.get('price'),
           mrp: formData.get('mrp'),
           tags: formData.get('tags'),
+          vol: formData.get('vol'),
         })
       });
       if (res.ok) {
@@ -250,6 +251,10 @@ export default function AdminDashboard() {
               <div className="field">
                 <label>Category Tag</label>
                 <input type="text" name="tags" defaultValue={editingProduct.tags?.[0]} required />
+              </div>
+              <div className="field">
+                <label>Volume/Size</label>
+                <input type="text" name="vol" defaultValue={editingProduct.vol} required />
               </div>
               <div className="modal-actions">
                 <button type="button" onClick={() => setEditingProduct(null)}>Cancel</button>

@@ -165,7 +165,7 @@ export default function FreshGuardStore({ initialCategory = 'all', hideHero = fa
     };
 
     syncUserState();
-  }, [currentUser, products]);
+  }, [currentUser]);
 
   const fetchProducts = async (category: string, query: string) => {
     setLoading(true);
@@ -369,11 +369,11 @@ export default function FreshGuardStore({ initialCategory = 'all', hideHero = fa
     }
   };
 
-  const cartTotal = cart.reduce((a, c) => a + c.price * c.qty, 0);
+  const cartTotal = Math.round(cart.reduce((a, c) => a + c.price * c.qty, 0) * 100) / 100;
   const cartQty = cart.reduce((a, c) => a + c.qty, 0);
-  const delivery = cartTotal >= 299 ? 0 : 49;
-  const discount = cartTotal >= 299 ? 49 : 0;
-  const grandTotal = cartTotal + delivery - discount;
+  const delivery = cartTotal >= 299 || cartTotal === 0 ? 0 : 49;
+  const discount = (cartTotal >= 299 && cartTotal > 0) ? 49 : 0;
+  const grandTotal = Math.max(0, Math.round((cartTotal + delivery - discount) * 100) / 100);
 
   // ── Wishlist ──
   const toggleWishlist = async (p: Product) => {
