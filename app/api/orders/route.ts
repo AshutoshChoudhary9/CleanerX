@@ -5,7 +5,13 @@ import Order from 'lib/mongodb/models/Order';
 export async function GET(req: NextRequest) {
   try {
     await connectToDatabase();
-    // Admin only check should be here in a real app
+    
+    // Simple admin authorization check using the owner password
+    const authHeader = req.headers.get('authorization');
+    if (authHeader !== 'Bearer admin123') {
+      return NextResponse.json({ error: 'Unauthorized access' }, { status: 401 });
+    }
+
     const orders = await Order.find().sort({ createdAt: -1 }).lean();
     return NextResponse.json({ orders });
   } catch (err) {

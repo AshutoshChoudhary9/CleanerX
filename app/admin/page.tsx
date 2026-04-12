@@ -38,7 +38,9 @@ export default function AdminDashboard() {
       const prodData = await prodRes.json();
       setProducts(prodData.products || []);
 
-      const orderRes = await fetch('/api/orders');
+      const orderRes = await fetch('/api/orders', {
+        headers: { 'Authorization': 'Bearer admin123' }
+      });
       const orderData = await orderRes.json();
       setOrders(orderData.orders || []);
     } catch (err) {

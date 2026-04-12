@@ -464,6 +464,14 @@ export default function FreshGuardStore({ initialCategory = 'all', hideHero = fa
             setCheckoutStep(4);
             setPaying(false);
             setCart([]);
+            // Clear DB Cart
+            const token = getAuthToken();
+            if (token) {
+              fetch('/api/cart/clear', {
+                method: 'POST',
+                headers: { Authorization: `Bearer ${token}` }
+              });
+            }
           },
           modal: { ondismiss: () => setPaying(false) },
         });
@@ -492,6 +500,14 @@ export default function FreshGuardStore({ initialCategory = 'all', hideHero = fa
         setOrderPlaced(orderId);
         setCheckoutStep(4);
         setCart([]);
+        // Clear DB Cart
+        const token = getAuthToken();
+        if (token) {
+          fetch('/api/cart/clear', {
+            method: 'POST',
+            headers: { Authorization: `Bearer ${token}` }
+          });
+        }
       }
     } catch {
       showToast('Payment failed. Please try again.', 'error');
@@ -1051,7 +1067,17 @@ export default function FreshGuardStore({ initialCategory = 'all', hideHero = fa
                 </>
               )}
               {modalState === 'checkout' && checkoutStep === 1 && (
-                <button className="btn-next" onClick={() => setCheckoutStep(2)}>Continue to Payment →</button>
+                <button className="btn-next" onClick={() => {
+                  if (!checkoutForm.name || !checkoutForm.mobile || !checkoutForm.address || !checkoutForm.city || !checkoutForm.pincode) {
+                    showToast('Please fill all address fields', 'error');
+                    return;
+                  }
+                  if (checkoutForm.mobile.length < 10) {
+                    showToast('Please enter a valid phone number', 'error');
+                    return;
+                  }
+                  setCheckoutStep(2);
+                }}>Continue to Payment →</button>
               )}
               {modalState === 'checkout' && checkoutStep === 2 && (
                 <>
@@ -1068,7 +1094,7 @@ export default function FreshGuardStore({ initialCategory = 'all', hideHero = fa
                 </>
               )}
               {modalState === 'checkout' && checkoutStep === 4 && (
-                <button className="btn-next" onClick={() => { setModalState('closed'); setCart([]); }}>Continue Shopping →</button>
+                <button className="btn-next" onClick={() => { setModalState('closed'); setCart([]); setCheckoutStep(1); }}>Continue Shopping →</button>
               )}
             </div>
           </div>
