@@ -24,10 +24,11 @@ export async function addItem(
     let cartId = (await cookies()).get("cartId")?.value;
     if (!cartId) {
       const cart = await createCart();
-      (await cookies()).set("cartId", cart.id!);
+      cartId = cart.id;
+      (await cookies()).set("cartId", cartId!);
     }
 
-    await addToCart([{ merchandiseId: selectedVariantId, quantity: 1 }]);
+    await addToCart([{ merchandiseId: selectedVariantId, quantity: 1 }], cartId);
     updateTag(TAGS.cart);
   } catch (e) {
     return "Error adding item to cart";
@@ -91,7 +92,7 @@ export async function updateItemQuantity(
       }
     } else if (quantity > 0) {
       // If the item doesn't exist in the cart and quantity > 0, add it
-      await addToCart([{ merchandiseId, quantity }]);
+      await addToCart([{ merchandiseId, quantity }], cart.id);
     }
 
     updateTag(TAGS.cart);

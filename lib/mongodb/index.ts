@@ -159,8 +159,8 @@ export async function createCart(): Promise<Cart> {
   } as unknown as Cart;
 }
 
-export async function addToCart(lines: { merchandiseId: string; quantity: number }[]): Promise<Cart> {
-  let cartId = (await cookies()).get('cartId')?.value;
+export async function addToCart(lines: { merchandiseId: string; quantity: number }[], providedCartId?: string): Promise<Cart> {
+  let cartId = providedCartId || (await cookies()).get('cartId')?.value;
 
   await connectToDatabase();
   let cart = cartId ? await CartModel.findOne({ cartId }) : null;
