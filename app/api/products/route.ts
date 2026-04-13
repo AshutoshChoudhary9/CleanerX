@@ -26,7 +26,7 @@ export async function GET(req: NextRequest) {
       filter.tags = { $regex: escapedCategory, $options: 'i' };
     }
 
-    const products = await Product.find(filter).lean();
+    const products = await Product.find(filter).limit(24).lean();
 
     // If no products in DB and no filter applied, return static seed data
     if (!products.length && !query && (!category || category === 'all')) {

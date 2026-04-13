@@ -41,7 +41,15 @@ export default function FreshGuardStore({ initialCategory = 'all', hideHero = fa
   const [selectedPayment, setSelectedPayment] = useState('upi');
   const [toasts, setToasts] = useState<{ id: number; msg: string; type: 'success' | 'error' }[]>([]);
   const [loading, setLoading] = useState(true);
-  const [timer, setTimer] = useState(5 * 3600 + 42 * 60 + 17);
+  const [timer, setTimer] = useState(0);
+
+  useEffect(() => {
+    // Set timer to end of current day
+    const now = new Date();
+    const end = new Date();
+    end.setHours(23, 59, 59, 999);
+    setTimer(Math.floor((end.getTime() - now.getTime()) / 1000));
+  }, []);
   const [paying, setPaying] = useState(false);
   const [orderPlaced, setOrderPlaced] = useState<string | null>(null);
   const [authOpen, setAuthOpen] = useState(false);
@@ -50,7 +58,7 @@ export default function FreshGuardStore({ initialCategory = 'all', hideHero = fa
   const [authForm, setAuthForm] = useState({ name: '', email: '', password: '' });
   const [authLoading, setAuthLoading] = useState(false);
   const [pendingAction, setPendingAction] = useState<{ type: 'cart' | 'wishlist'; product: Product } | null>(null);
-  const [checkoutForm, setCheckoutForm] = useState({ name: '', mobile: '', address: '', city: '', pincode: '', state: 'Uttar Pradesh' });
+  const [checkoutForm, setCheckoutForm] = useState({ name: '', email: '', mobile: '', address: '', city: '', pincode: '', state: 'Uttar Pradesh' });
   
   const searchRef = useRef<HTMLInputElement>(null);
   const productsRef = useRef<HTMLDivElement>(null);
@@ -284,9 +292,10 @@ export default function FreshGuardStore({ initialCategory = 'all', hideHero = fa
       return requireLogin(p, 'cart');
     }
 
+    const cartKey = `${p.id}-${p.vol || 'std'}`;
     setCart(prev => {
-      const ex = prev.find(c => c.id === p.id);
-      if (ex) return prev.map(c => c.id === p.id ? { ...c, qty: c.qty + 1 } : c);
+      const ex = prev.find(c => `${c.id}-${c.vol || 'std'}` === cartKey);
+      if (ex) return prev.map(c => `${c.id}-${c.vol || 'std'}` === cartKey ? { ...c, qty: c.qty + 1 } : c);
       return [...prev, { ...p, qty: 1 }];
     });
 
@@ -309,9 +318,9 @@ export default function FreshGuardStore({ initialCategory = 'all', hideHero = fa
       showToast('Error saving to cart', 'error');
       // Rollback local state
       setCart(prev => {
-        const target = prev.find(c => c.id === p.id);
-        if (target && target.qty > 1) return prev.map(c => c.id === p.id ? { ...c, qty: c.qty - 1 } : c);
-        return prev.filter(c => c.id !== p.id);
+        const target = prev.find(c => `${c.id}-${c.vol || 'std'}` === cartKey);
+        if (target && target.qty > 1) return prev.map(c => `${c.id}-${c.vol || 'std'}` === cartKey ? { ...c, qty: c.qty - 1 } : c);
+        return prev.filter(c => `${c.id}-${c.vol || 'std'}` === cartKey);
       });
     }
   };
@@ -322,11 +331,11 @@ export default function FreshGuardStore({ initialCategory = 'all', hideHero = fa
       return;
     }
 
-    const target = cart.find(c => c.id === id);
+    const target = cart.find(c => `${c.id}-${c.vol || 'std'}` === id);
     if (!target) return;
 
     setCart(prev => {
-      const updated = prev.map(c => c.id === id ? { ...c, qty: c.qty + delta } : c);
+      const updated = prev.map(c => `${c.id}-${c.vol || 'std'}` === id ? { ...c, qty: c.qty + delta } : c);
       return updated.filter(c => c.qty > 0);
     });
 
@@ -372,7 +381,8 @@ export default function FreshGuardStore({ initialCategory = 'all', hideHero = fa
   const cartQty = cart.reduce((a, c) => a + c.qty, 0);
   const delivery = cartTotal >= 299 || cartTotal === 0 ? 0 : 49;
   const discount = (cartTotal >= 299 && cartTotal > 0) ? 49 : 0;
-  const grandTotal = Math.max(0, Math.round((cartTotal + delivery - discount + (selectedPayment === 'cod' ? 49 : 0)) * 100) / 100);
+  const upiDiscount = selectedPayment === 'upi' ? Math.round(cartTotal * 0.1) : 0;
+  const grandTotal = Math.max(0, Math.round((cartTotal + delivery - discount - upiDiscount + (selectedPayment === 'cod' ? 49 : 0)) * 100) / 100);
 
   // ── Wishlist ──
   const toggleWishlist = async (p: Product) => {
@@ -427,6 +437,7 @@ export default function FreshGuardStore({ initialCategory = 'all', hideHero = fa
           body: JSON.stringify({
             orderId: data.orderId,
             customerName: checkoutForm.name,
+            email: checkoutForm.email || currentUser?.email || '',
             mobile: checkoutForm.mobile,
             address: checkoutForm.address,
             city: checkoutForm.city,
@@ -485,6 +496,7 @@ export default function FreshGuardStore({ initialCategory = 'all', hideHero = fa
           body: JSON.stringify({
             orderId,
             customerName: checkoutForm.name,
+            email: checkoutForm.email || currentUser?.email || '',
             mobile: checkoutForm.mobile,
             address: checkoutForm.address,
             city: checkoutForm.city,
@@ -992,6 +1004,7 @@ export default function FreshGuardStore({ initialCategory = 'all', hideHero = fa
                   {checkoutStep === 1 && (
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
                       <div className="form-group"><label>Full Name</label><input type="text" placeholder="Your full name" value={checkoutForm.name} onChange={e => setCheckoutForm({...checkoutForm, name: e.target.value})} /></div>
+                      <div className="form-group"><label>Email Address</label><input type="email" placeholder="email@example.com" value={checkoutForm.email} onChange={e => setCheckoutForm({...checkoutForm, email: e.target.value})} /></div>
                       <div className="form-group"><label>Mobile Number</label><input type="tel" placeholder="10-digit mobile number" value={checkoutForm.mobile} onChange={e => setCheckoutForm({...checkoutForm, mobile: e.target.value})} /></div>
                       <div className="form-group"><label>Address Line 1</label><input type="text" placeholder="House/Flat/Block No." value={checkoutForm.address} onChange={e => setCheckoutForm({...checkoutForm, address: e.target.value})} /></div>
                       <div className="form-row">
@@ -1040,7 +1053,9 @@ export default function FreshGuardStore({ initialCategory = 'all', hideHero = fa
                         </div>
                       ))}
                       <div className="os-item"><span>Delivery</span><span>{delivery === 0 ? 'FREE' : `₹${delivery}`}</span></div>
-                      <div className="os-item" style={{ color: 'var(--success)' }}><span>Discount</span><span>-₹{discount}</span></div>
+                      <div className="os-item" style={{ color: 'var(--success)' }}><span>Combo Discount</span><span>-₹{discount}</span></div>
+                      {upiDiscount > 0 && <div className="os-item" style={{ color: 'var(--success)' }}><span>UPI Off (10%)</span><span>-₹{upiDiscount}</span></div>}
+                      {selectedPayment === 'cod' && <div className="os-item" style={{ color: '#ef4444' }}><span>COD Fee</span><span>+₹49</span></div>}
                       <div className="os-total"><span>Total Payable</span><span>₹{grandTotal}</span></div>
                     </div>
                   )}
@@ -1066,10 +1081,14 @@ export default function FreshGuardStore({ initialCategory = 'all', hideHero = fa
                   <button className="btn-next" onClick={() => { addToCart(selectedProduct); if (currentUser) { setModalState('checkout'); setCheckoutStep(1); setOrderPlaced(null); } }}>⚡ Buy Now</button>
                 </>
               )}
-              {modalState === 'checkout' && checkoutStep === 1 && (
+               {modalState === 'checkout' && checkoutStep === 1 && (
                 <button className="btn-next" onClick={() => {
-                  if (!checkoutForm.name || !checkoutForm.mobile || !checkoutForm.address || !checkoutForm.city || !checkoutForm.pincode) {
+                  if (!checkoutForm.name || !checkoutForm.email || !checkoutForm.mobile || !checkoutForm.address || !checkoutForm.city || !checkoutForm.pincode) {
                     showToast('Please fill all address fields', 'error');
+                    return;
+                  }
+                  if (!checkoutForm.email.includes('@')) {
+                    showToast('Please enter a valid email', 'error');
                     return;
                   }
                   if (checkoutForm.mobile.length < 10) {

@@ -11,6 +11,8 @@ export default function AdminDashboard() {
   const [orders, setOrders] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [editingProduct, setEditingProduct] = useState<any>(null);
+  const [orderFilter, setOrderFilter] = useState<'all' | 'pending' | 'paid' | 'failed'>('all');
+  const [productSort, setProductSort] = useState<'title' | 'price'>('title');
 
   const [productForm, setProductForm] = useState({
     title: '',
@@ -189,8 +191,18 @@ export default function AdminDashboard() {
 
         {activeTab === 'orders' && (
           <div className="orders-view">
-            <h2>Order History</h2>
-            {orders.length === 0 ? <p>No orders yet.</p> : (
+            <div className="header">
+              <h2>Order History</h2>
+              <div className="filters">
+                <select value={orderFilter} onChange={e => setOrderFilter(e.target.value as any)}>
+                  <option value="all">All Orders</option>
+                  <option value="pending">Pending</option>
+                  <option value="paid">Paid</option>
+                  <option value="failed">Failed</option>
+                </select>
+              </div>
+            </div>
+            {orders.filter(o => orderFilter === 'all' || o.paymentStatus === orderFilter).length === 0 ? <p>No orders found for this filter.</p> : (
               <table>
                 <thead>
                   <tr>
