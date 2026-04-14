@@ -27,9 +27,12 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const productsPromise = getProducts({}).then((products) =>
     products.map((product) => ({
       url: `${baseUrl}/product/${product.handle}`,
-      lastModified: product.updatedAt,
+      lastModified: product.updatedAt || new Date().toISOString(),
     })),
-  );
+  ).catch(err => {
+    console.error("Sitemap Products Fetch Error:", err);
+    return [];
+  });
 
   const pagesPromise = getPages().then((pages) =>
     pages.map((page) => ({
@@ -41,11 +44,13 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   let fetchedRoutes: Route[] = [];
 
   try {
-    fetchedRoutes = (
-      await Promise.all([collectionsPromise, productsPromise, pagesPromise])
-    ).flat();
+    const results = await Promise.allSettled([collectionsPromise, productsPromise, pagesPromise]);
+    fetchedRoutes = results
+      .filter((r): r is PromiseFulfilledResult<Route[]> => r.status === 'fulfilled')
+      .map(r => r.value)
+      .flat();
   } catch (error) {
-    throw JSON.stringify(error, null, 2);
+    console.error("Critical Sitemap Error:", error);
   }
 
   return [...routesMap, ...fetchedRoutes];

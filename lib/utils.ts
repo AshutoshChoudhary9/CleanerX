@@ -22,6 +22,7 @@ export const ensureStartsWith = (stringToCheck: string, startsWith: string) =>
 export const validateEnvironmentVariables = () => {
   const requiredEnvironmentVariables = [
     "MONGODB_URI",
+    "JWT_SECRET"
   ];
   const missingEnvironmentVariables = [] as string[];
 

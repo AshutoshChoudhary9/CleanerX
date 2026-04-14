@@ -18,7 +18,7 @@ export async function generateMetadata(props: {
 
   if (!product) return notFound();
 
-  const { url, width, height, altText: alt } = product.featuredImage || {};
+  const { url, width, height, altText: alt } = product.featuredImage || { url: '', width: 0, height: 0, altText: '' };
   const indexable = !product.tags.includes(HIDDEN_PRODUCT_TAG);
 
   return {
@@ -60,15 +60,15 @@ export default async function ProductPage(props: {
     "@type": "Product",
     name: product.title,
     description: product.description,
-    image: product.featuredImage.url,
+    image: product.featuredImage?.url || '',
     offers: {
       "@type": "AggregateOffer",
       availability: product.availableForSale
         ? "https://schema.org/InStock"
         : "https://schema.org/OutOfStock",
-      priceCurrency: product.priceRange.minVariantPrice.currencyCode,
-      highPrice: product.priceRange.maxVariantPrice.amount,
-      lowPrice: product.priceRange.minVariantPrice.amount,
+      priceCurrency: product.priceRange.minVariantPrice?.currencyCode || 'INR',
+      highPrice: product.priceRange.maxVariantPrice?.amount || '0',
+      lowPrice: product.priceRange.minVariantPrice?.amount || '0',
     },
   };
 

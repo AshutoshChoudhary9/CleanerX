@@ -114,17 +114,18 @@ export async function getCartById(cartId: string): Promise<Cart | undefined> {
     };
   }));
 
-  const activeLines = lines.filter(Boolean);
+  const activeLines = lines.filter(Boolean) as any[];
   const subtotal = activeLines.reduce((acc, line: any) => acc + parseFloat(line.cost.totalAmount.amount), 0);
   const totalQuantity = activeLines.reduce((acc, line: any) => acc + line.quantity, 0);
+  const currencyCode = activeLines.length > 0 ? activeLines[0].cost.totalAmount.currencyCode : 'INR'; // Default to INR if empty
 
   return {
     id: cartId,
     checkoutUrl: '', // This will be handled by Razorpay
     cost: {
-      subtotalAmount: { amount: subtotal.toFixed(2), currencyCode: 'USD' },
-      totalAmount: { amount: subtotal.toFixed(2), currencyCode: 'USD' },
-      totalTaxAmount: { amount: '0.00', currencyCode: 'USD' }
+      subtotalAmount: { amount: subtotal.toFixed(2), currencyCode },
+      totalAmount: { amount: subtotal.toFixed(2), currencyCode },
+      totalTaxAmount: { amount: '0.00', currencyCode }
     },
     lines: activeLines,
     totalQuantity
@@ -147,12 +148,13 @@ export async function createCart(): Promise<Cart> {
   // For now we'll just return the cart object. The template handles setting the cookie.
 
   return {
+  return {
     id: cartId,
     checkoutUrl: '',
     cost: {
-      subtotalAmount: { amount: '0.00', currencyCode: 'USD' },
-      totalAmount: { amount: '0.00', currencyCode: 'USD' },
-      totalTaxAmount: { amount: '0.00', currencyCode: 'USD' }
+      subtotalAmount: { amount: '0.00', currencyCode: 'INR' },
+      totalAmount: { amount: '0.00', currencyCode: 'INR' },
+      totalTaxAmount: { amount: '0.00', currencyCode: 'INR' }
     },
     lines: [],
     totalQuantity: 0
