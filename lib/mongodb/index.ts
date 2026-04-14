@@ -9,7 +9,8 @@ export async function getProducts({ query, reverse, sortKey }: { query?: string;
   await connectToDatabase();
   let filter = {};
   if (query) {
-    filter = { $or: [{ title: new RegExp(query, 'i') }, { tags: new RegExp(query, 'i') }] };
+    const escapedQuery = query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    filter = { $or: [{ title: new RegExp(escapedQuery, 'i') }, { tags: new RegExp(escapedQuery, 'i') }] };
   }
 
   let sort: any = {};
@@ -134,20 +135,49 @@ export async function getCartById(cartId: string): Promise<Cart | undefined> {
 
 export async function getCart(): Promise<Cart | undefined> {
   const cartId = (await cookies()).get('cartId')?.value;
+  // If we have an authToken cookie, we should check for user cart too
+  const authToken = (await cookies()).get('authToken')?.value;
+  
+  await connectToDatabase();
+
+  if (authToken) {
+    try {
+      const { verifyAuthToken } = require('lib/auth/jwt');
+      const user = verifyAuthToken(authToken);
+      if (user) {
+        // Try to find cart by userId
+        const cartDoc = await CartModel.findOne({ userId: user.userId }).lean();
+        if (cartDoc) return getCartById(cartDoc.cartId);
+      }
+    } catch (e) {
+      console.error('Auth token validation failed in getCart:', e);
+    }
+  }
+
   if (!cartId) return undefined;
   return getCartById(cartId);
 }
 
+export async function getCartByUserId(userId: string): Promise<Cart | undefined> {
+  await connectToDatabase();
+  const cartDoc = await CartModel.findOne({ userId }).lean();
+  if (!cartDoc) return undefined;
+  return getCartById(cartDoc.cartId);
+}
+
 export async function createCart(): Promise<Cart> {
-  const cartId = Math.random().toString(36).substring(7);
+  const cartId = Math.random().toString(36).substring(2) + Math.random().toString(36).substring(2);
   await connectToDatabase();
   const cart = new CartModel({ cartId, items: [] });
   await cart.save();
 
-  // Set cookie (this usually happens in a server action or middleware in this template)
-  // For now we'll just return the cart object. The template handles setting the cookie.
+  // Set cookie for the new cart
+  (await cookies()).set('cartId', cartId, {
+    path: '/',
+    sameSite: 'lax',
+    httpOnly: true
+  });
 
-  return {
   return {
     id: cartId,
     checkoutUrl: '',
@@ -168,7 +198,7 @@ export async function addToCart(lines: { merchandiseId: string; quantity: number
   let cart = cartId ? await CartModel.findOne({ cartId }) : null;
 
   if (!cart) {
-    cartId = Math.random().toString(36).substring(7);
+    cartId = Math.random().toString(36).substring(2) + Math.random().toString(36).substring(2);
     cart = new CartModel({ cartId, items: [] });
   }
 
@@ -177,7 +207,7 @@ export async function addToCart(lines: { merchandiseId: string; quantity: number
     if (existingIndex > -1) {
       cart.items[existingIndex].quantity += line.quantity;
     } else {
-      cart.items.push({ id: Math.random().toString(36).substring(7), ...line });
+      cart.items.push({ id: Math.random().toString(36).substring(2) + Math.random().toString(36).substring(2), ...line });
     }
   }
 
@@ -232,8 +262,16 @@ export async function getPages() {
 }
 
 export async function getProductRecommendations(productId: string) {
-  // Return some random products
-  const recommendations = await Product.find({}).limit(4).lean();
+  await connectToDatabase();
+  // Find the current product to get its tags
+  const currentProduct = await Product.findById(productId).lean();
+  
+  // Find products that are NOT the current one, ideally matching tags
+  const recommendations = await Product.find({
+    _id: { $ne: productId },
+    ...(currentProduct?.tags?.length ? { tags: { $in: currentProduct.tags } } : {})
+  }).limit(4).lean();
+  
   return recommendations.map(p => ({ ...p, id: p._id.toString(), _id: p._id.toString() })) as unknown as ProductType[];
 }
 

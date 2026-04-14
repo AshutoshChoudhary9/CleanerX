@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import Razorpay from 'razorpay';
+import { getCartById } from 'lib/mongodb';
 
 const razorpay = new Razorpay({
   key_id: process.env.RAZORPAY_KEY_ID!,
@@ -9,14 +10,25 @@ const razorpay = new Razorpay({
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const { amount, currency = 'INR', receipt } = body;
+    const { cartId, currency = 'INR', receipt } = body;
 
-    if (!amount || amount <= 0) {
-      return NextResponse.json({ error: 'Invalid amount' }, { status: 400 });
+    if (!cartId) {
+      return NextResponse.json({ error: 'Cart ID is required' }, { status: 400 });
+    }
+
+    const cart = await getCartById(cartId);
+    if (!cart || !cart.lines.length) {
+      return NextResponse.json({ error: 'Empty or invalid cart' }, { status: 400 });
+    }
+
+    const totalAmount = parseFloat(cart.cost.totalAmount.amount);
+
+    if (totalAmount <= 0) {
+      return NextResponse.json({ error: 'Invalid cart total' }, { status: 400 });
     }
 
     const options = {
-      amount: Math.round(amount * 100), // convert ₹ to paise
+      amount: Math.round(totalAmount * 100), // convert ₹ to paise
       currency,
       receipt: receipt || `receipt_${Date.now()}`,
     };

@@ -245,7 +245,11 @@ function RazorpayCheckoutButton({ cart }: { cart: any }) {
   const handleCheckout = async () => {
     setLoading(true);
     try {
-      const res = await fetch("/api/razorpay", { method: "POST" });
+      const res = await fetch("/api/razorpay", { 
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ cartId: cart.id })
+      });
       const order = await res.json();
 
       if (order.error) {

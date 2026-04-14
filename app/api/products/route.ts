@@ -54,9 +54,16 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   try {
+    // Admin check
+    const authHeader = req.headers.get('authorization');
+    const adminPass = process.env.ADMIN_PASSWORD || 'admin123';
+    if (authHeader !== `Bearer ${adminPass}`) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
     await connectToDatabase();
     const body = await req.json();
-    const { name, price, mrp, volume, category, fragrance, description } = body;
+    const { name, price, mrp, volume, category, fragrance, description, imageUrl } = body;
 
     if (!name || price === undefined) {
       return NextResponse.json({ error: 'Name and price are required' }, { status: 400 });
@@ -84,8 +91,13 @@ export async function POST(req: NextRequest) {
         selectedOptions: [{ name: 'Volume', value: volume || 'Standard' }],
         price: { amount: priceStr, currencyCode: 'INR' },
       }],
-      featuredImage: { url: '', altText: name, width: 400, height: 400 },
-      images: [],
+      featuredImage: { 
+        url: imageUrl || 'https://images.unsplash.com/photo-1584622650111-993a426fbf0a?q=80&w=400&h=400&auto=format&fit=crop', 
+        altText: name, 
+        width: 400, 
+        height: 400 
+      },
+      images: imageUrl ? [{ url: imageUrl, altText: name, width: 400, height: 400 }] : [],
       seo: { title: name, description: description || name },
       tags: [category, fragrance].filter(Boolean),
     });
@@ -100,6 +112,13 @@ export async function POST(req: NextRequest) {
 
 export async function PUT(req: NextRequest) {
   try {
+    // Admin check
+    const authHeader = req.headers.get('authorization');
+    const adminPass = process.env.ADMIN_PASSWORD || 'admin123';
+    if (authHeader !== `Bearer ${adminPass}`) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
     await connectToDatabase();
     const body = await req.json();
     const { id, price, mrp, tags, title, vol } = body;
@@ -129,6 +148,13 @@ export async function PUT(req: NextRequest) {
 
 export async function DELETE(req: NextRequest) {
   try {
+    // Admin check
+    const authHeader = req.headers.get('authorization');
+    const adminPass = process.env.ADMIN_PASSWORD || 'admin123';
+    if (authHeader !== `Bearer ${adminPass}`) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
     await connectToDatabase();
     const { searchParams } = new URL(req.url);
     const id = searchParams.get('id');

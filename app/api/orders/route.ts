@@ -1,14 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server';
 import connectToDatabase from 'lib/mongodb/db';
 import Order from 'lib/mongodb/models/Order';
+import mongoose from 'mongoose';
 
 export async function GET(req: NextRequest) {
   try {
     await connectToDatabase();
     
-    // Simple admin authorization check using the owner password
+    // Simple admin authorization check
     const authHeader = req.headers.get('authorization');
-    if (authHeader !== 'Bearer admin123') {
+    const adminPass = process.env.ADMIN_PASSWORD || 'admin123';
+    if (authHeader !== `Bearer ${adminPass}`) {
       return NextResponse.json({ error: 'Unauthorized access' }, { status: 401 });
     }
 
@@ -26,20 +28,20 @@ export async function POST(req: NextRequest) {
   try {
     await connectToDatabase();
     const body = await req.json();
-    const { items, paymentMethod } = body;
+    const { items, paymentMethod, customerName, email, mobile, address, city, pincode, state, orderId } = body;
 
     // Recalculate totalAmount server-side to prevent tampering
     const productIds = items.map((i: any) => i.id);
     const dbProducts = await Product.find({ 
       $or: [
-        { _id: { $in: productIds.filter((id: string) => id.length === 24) } },
-        { id: { $in: productIds } }
+        { _id: { $in: productIds.filter((id: string) => mongoose.Types.ObjectId.isValid(id)) } },
+        { handle: { $in: productIds } }
       ]
     }).lean();
 
     let serverTotal = 0;
     const validatedItems = items.map((item: any) => {
-      const p = dbProducts.find((dbP: any) => dbP._id.toString() === item.id || dbP.id === item.id);
+      const p = dbProducts.find((dbP: any) => dbP._id.toString() === item.id || dbP.handle === item.id);
       if (!p) throw new Error(`Product not found: ${item.title}`);
       
       const price = parseFloat(p.price || p.priceRange?.minVariantPrice?.amount || '0');
@@ -60,10 +62,18 @@ export async function POST(req: NextRequest) {
     const finalTotal = Math.max(0, serverTotal + delivery - comboDiscount - upiDiscount + codFee);
 
     const order = new Order({
-      ...body,
+      customerName,
+      email,
+      mobile,
+      address,
+      city,
+      pincode,
+      state,
+      paymentMethod,
       items: validatedItems,
-      totalAmount: finalTotal, // Overwrite with server calculated total
-      orderId: body.orderId || `FG${Date.now()}`
+      totalAmount: finalTotal,
+      orderId: orderId || `FG${Date.now()}`,
+      paymentStatus: 'pending' // Default status
     });
     
     await order.save();
@@ -76,6 +86,13 @@ export async function POST(req: NextRequest) {
 
 export async function PATCH(req: NextRequest) {
   try {
+    const authHeader = req.headers.get('authorization');
+    const adminPass = process.env.ADMIN_PASSWORD || 'admin123';
+    // For payments, we could also verify with a Razorpay webhook/secret if needed
+    if (authHeader !== `Bearer ${adminPass}`) {
+       return NextResponse.json({ error: 'Unauthorized access' }, { status: 401 });
+    }
+
     await connectToDatabase();
     const body = await req.json();
     const { id, orderId, status, razorpayPaymentId } = body;

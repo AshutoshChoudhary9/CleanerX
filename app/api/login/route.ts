@@ -3,9 +3,8 @@ import bcrypt from 'bcryptjs';
 import { cookies } from 'next/headers';
 import connectToDatabase from 'lib/mongodb/db';
 import User from 'lib/mongodb/models/User';
-import CartModel from 'lib/mongodb/models/Cart';
-import UserCart from 'lib/mongodb/models/UserCart';
 import { signAuthToken } from 'lib/auth/jwt';
+import CartModel from 'lib/mongodb/models/Cart';
 
 export async function POST(req: NextRequest) {
   try {
@@ -30,32 +29,52 @@ export async function POST(req: NextRequest) {
 
     const token = signAuthToken({ userId: user._id.toString(), email: user.email, name: user.name });
 
+    // Set authToken cookie for Server Component accessibility
+    (await cookies()).set('authToken', token, {
+      path: '/',
+      httpOnly: true,
+      sameSite: 'lax',
+      maxAge: 60 * 60 * 24 * 7 // 1 week
+    });
+
     // --- Anonymous Cart Synchronization Logic ---
     try {
       const cartId = (await cookies()).get('cartId')?.value;
       if (cartId) {
+        // Find anonymous cart
         const anonCart = await CartModel.findOne({ cartId });
-        if (anonCart && anonCart.items.length > 0) {
-          // Merge anonymous items into user cart
-          let userCart = await UserCart.findOne({ userId: user._id });
-          if (!userCart) {
-            userCart = new UserCart({ userId: user._id, products: [] });
-          }
+        
+        // Find if user already has a linked cart
+        const userCart = await CartModel.findOne({ userId: user._id });
 
-          for (const item of anonCart.items) {
-            // Mapping merchandiseId (variant id) to productId in UserCart
-            const existingProduct = userCart.products.find((p: any) => p.productId === item.merchandiseId);
-            if (existingProduct) {
-              existingProduct.quantity += item.quantity;
-            } else {
-              userCart.products.push({ productId: item.merchandiseId, quantity: item.quantity });
+        if (anonCart) {
+          if (userCart && userCart.cartId !== anonCart.cartId) {
+            // Merge anonCart into userCart
+            for (const item of anonCart.items) {
+              const existingIndex = userCart.items.findIndex((i: any) => i.merchandiseId === item.merchandiseId);
+              if (existingIndex > -1) {
+                userCart.items[existingIndex].quantity += item.quantity;
+              } else {
+                userCart.items.push(item);
+              }
             }
+            await userCart.save();
+            await CartModel.deleteOne({ cartId: anonCart.cartId });
+            (await cookies()).set('cartId', userCart.cartId);
+          } else if (!userCart) {
+            // Link anonCart to user
+            anonCart.userId = user._id;
+            await anonCart.save();
           }
-          await userCart.save();
-          
-          // Clear anonymous cart after successful sync
-          await CartModel.deleteOne({ cartId });
-          (await cookies()).delete('cartId');
+        } else if (userCart) {
+          // No anonymous cart, but user has one from before
+          (await cookies()).set('cartId', userCart.cartId);
+        }
+      } else {
+        // No anonymous cart cookie, check if user has a saved cart
+        const userCart = await CartModel.findOne({ userId: user._id });
+        if (userCart) {
+          (await cookies()).set('cartId', userCart.cartId);
         }
       }
     } catch (syncErr) {

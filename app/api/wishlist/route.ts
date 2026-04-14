@@ -3,6 +3,7 @@ import connectToDatabase from 'lib/mongodb/db';
 import Wishlist from 'lib/mongodb/models/Wishlist';
 import Product from 'lib/mongodb/models/Product';
 import { requireAuth } from 'lib/middleware/auth';
+import mongoose from 'mongoose';
 
 export async function GET(req: NextRequest) {
   const { user, error } = requireAuth(req);
@@ -16,19 +17,22 @@ export async function GET(req: NextRequest) {
     }
 
     // Manually join with Products
+    const validProductIds = wishlist.products.filter((id: string) => mongoose.Types.ObjectId.isValid(id));
+    const handleProductIds = wishlist.products.filter((id: string) => !mongoose.Types.ObjectId.isValid(id));
+
     const productDocs = await Product.find({ 
       $or: [
-        { _id: { $in: wishlist.products.filter((id: string) => id.length === 24) } },
-        { id: { $in: wishlist.products } }
+        { _id: { $in: validProductIds } },
+        { handle: { $in: handleProductIds } }
       ]
     }).lean();
 
     const populatedProducts = wishlist.products.map((id: string) => {
-      const p = productDocs.find((doc: any) => doc._id.toString() === id || doc.id === id);
+      const p = productDocs.find((doc: any) => doc._id.toString() === id || doc.handle === id);
       if (!p) return null;
       return {
         ...p,
-        id: p.id || p._id.toString()
+        id: p._id.toString()
       };
     }).filter(Boolean);
 
