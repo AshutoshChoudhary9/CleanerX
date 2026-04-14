@@ -28,9 +28,15 @@ export async function GET(req: NextRequest) {
 
     const products = await Product.find(filter).limit(24).lean();
 
-    // If no products in DB and no filter applied, return static seed data
-    if (!products.length && !query && (!category || category === 'all')) {
-      return NextResponse.json({ products: SEED_PRODUCTS });
+    // If no products in DB, return static seed data (optionally filtered by category)
+    if (!products.length && !query) {
+      if (!category || category === 'all') {
+        return NextResponse.json({ products: SEED_PRODUCTS });
+      }
+      const filteredSeed = SEED_PRODUCTS.filter(p => 
+        p.tags.some(tag => tag.toLowerCase().includes(category.toLowerCase()))
+      );
+      return NextResponse.json({ products: filteredSeed });
     }
 
     return NextResponse.json({
@@ -149,4 +155,8 @@ const SEED_PRODUCTS = [
   { id: '10', title: 'FreshGuard Streak-Free Mirror Cleaner', icon: '🪞', price: 139, mrp: 189, tags: ['glass'], vol: '750 ml', rating: 4.4, ratingCount: 1234, badge: 'Top Rated' },
   { id: '11', title: 'FreshGuard Anti-Fog Glass Protector', icon: '🔭', price: 179, mrp: 239, tags: ['glass'], vol: '500 ml', rating: 4.3, ratingCount: 567, badge: 'New' },
   { id: '12', title: 'FreshGuard Ultra Shine Glass Liquid', icon: '✨', price: 159, mrp: 219, tags: ['glass'], vol: '1 Litre', rating: 4.5, ratingCount: 2341, badge: 'Hot' },
+  { id: '13', title: 'FreshGuard Home Essentials Combo', icon: '📦', price: 399, mrp: 499, tags: ['combo'], vol: '3-Pack', rating: 4.9, ratingCount: 452, badge: 'Value Pack' },
+  { id: '14', title: 'FreshGuard Bulk Floor Disinfectant', icon: '🏭', price: 1299, mrp: 1699, tags: ['bulk'], vol: '20 Litre', rating: 4.8, ratingCount: 124, badge: 'Factory Price' },
+  { id: '15', title: 'FreshGuard Festive Sparkle Pack', icon: '🎉', price: 299, mrp: 399, tags: ['festive'], vol: 'Limited Edition', rating: 4.7, ratingCount: 89, badge: 'Seasonal' },
+  { id: '16', title: 'FreshGuard Monthly Protection Plan', icon: '🔁', price: 449, mrp: 549, tags: ['subscribe'], vol: 'Monthly', rating: 5.0, ratingCount: 1205, badge: 'Subscription' },
 ];

@@ -223,8 +223,9 @@ export default function FreshGuardStore({ initialCategory = 'all', hideHero = fa
     if (product && type) {
       setPendingAction({ type, product });
     }
-    const redirectPath = pathname || '/';
-    router.push(`/login?redirect=${encodeURIComponent(redirectPath)}`);
+    setAuthOpen(true);
+    // Scroll to top where the auth dropdown is located
+    window.scrollTo({ top: 0, behavior: 'smooth' });
     return false;
   };
 
@@ -558,14 +559,7 @@ export default function FreshGuardStore({ initialCategory = 'all', hideHero = fa
             <div className="signin-wrapper" ref={authRef}>
               <button
                 className="nav-btn"
-                onClick={() => {
-                  if (currentUser) {
-                    setAuthOpen(!authOpen);
-                  } else {
-                    const redirectPath = pathname || '/';
-                    router.push(`/login?redirect=${encodeURIComponent(redirectPath)}`);
-                  }
-                }}
+                onClick={() => setAuthOpen(!authOpen)}
               >
                 <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />

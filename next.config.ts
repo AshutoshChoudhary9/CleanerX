@@ -1,9 +1,10 @@
 /** @type {import('next').NextConfig} */
 export default {
   experimental: {
-    ppr: true,
-    inlineCss: true,
-    useCache: true,
+    // Disabling for stability during navigation
+    ppr: false,
+    inlineCss: false,
+    useCache: false,
   },
   images: {
     formats: ['image/avif', 'image/webp'],

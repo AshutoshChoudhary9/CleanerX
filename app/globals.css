@@ -304,3 +304,18 @@ footer{background:#0f172a;color:rgba(255,255,255,.7);padding:64px 24px 32px;marg
 .auth-card .input-field input { padding: 12px 15px; font-size: 1rem; border-radius: 8px; border: solid 1px #8d8d8d; letter-spacing: 1px; width: 100%; background:transparent; color:#0f172a; }
 .auth-card .input-field input:focus, .auth-card .input-field input:valid { outline: none; border: solid 1px #0034de; }
 .auth-card .input-field input:focus ~ label, .auth-card .input-field input:valid ~ label { transform: translateY(-22px) translateX(-10px) scale(0.85); background-color: #fff; padding: 0px 6px; color: #0034de; font-weight: bold; letter-spacing: 1px; }
+.loading-screen {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: 'DM Sans', sans-serif;
+  color: var(--primary);
+  font-weight: 700;
+  background: var(--bg);
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
