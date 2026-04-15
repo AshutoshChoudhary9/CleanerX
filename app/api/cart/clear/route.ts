@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import connectToDatabase from 'lib/mongodb/db';
-import UserCart from 'lib/mongodb/models/UserCart';
+import { clearCart } from 'lib/mongodb';
 import { requireAuth } from 'lib/middleware/auth';
 
 export async function POST(req: NextRequest) {
@@ -8,11 +7,7 @@ export async function POST(req: NextRequest) {
   if (error) return error;
 
   try {
-    await connectToDatabase();
-    await UserCart.findOneAndUpdate(
-      { userId: user.userId },
-      { $set: { products: [] } }
-    );
+    await clearCart(user.userId);
     return NextResponse.json({ success: true });
   } catch (err) {
     console.error('Clear Cart API Error:', err);

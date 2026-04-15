@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
+import Script from 'next/script';
 import { usePathname, useRouter } from 'next/navigation';
 
 // ── Types ──
@@ -16,6 +17,11 @@ interface Product {
   rating?: number;
   ratingCount?: number;
   badge?: string;
+  metadata?: {
+    bundleItems?: string[];
+    bulkQty?: number;
+    subDiscount?: number;
+  };
 }
 interface CartItem extends Product { qty: number; }
 
@@ -75,7 +81,14 @@ export default function FreshGuardStore({ initialCategory = 'all', hideHero = fa
 
   // ── Fetch products ──
   useEffect(() => {
-    const interval = setInterval(() => setTimer(t => t > 0 ? t - 1 : 6 * 3600), 1000);
+    const interval = setInterval(() => setTimer(t => {
+      if (t > 0) return t - 1;
+      // Reset to end of current day instead of a fixed 6h window
+      const now = new Date();
+      const end = new Date();
+      end.setHours(23, 59, 59, 999);
+      return Math.floor((end.getTime() - now.getTime()) / 1000);
+    }), 1000);
     const handleClickOutside = (event: MouseEvent) => {
       if (authRef.current && !authRef.current.contains(event.target as Node)) {
         setAuthOpen(false);
@@ -110,8 +123,9 @@ export default function FreshGuardStore({ initialCategory = 'all', hideHero = fa
     bootstrapAuth();
   }, []);
 
+  // Sync cart & wishlist whenever a user logs in (no products dependency needed)
   useEffect(() => {
-    if (!currentUser || products.length === 0) return;
+    if (!currentUser) return;
 
     const syncUserState = async () => {
       const token = typeof window !== 'undefined' ? localStorage.getItem('authToken') : null;
@@ -125,22 +139,22 @@ export default function FreshGuardStore({ initialCategory = 'all', hideHero = fa
 
         if (cartRes.ok) {
           const cartData = await cartRes.json();
-          const cartProducts = (cartData.cart?.products || []).map((p: any) => {
-            const price = p.price || parseFloat(p.priceRange?.minVariantPrice?.amount || '0');
-            const mrp = p.mrp || parseFloat(p.priceRange?.maxVariantPrice?.amount || '0') || price * 1.3;
-            const vol = p.vol || p.variants?.[0]?.title || 'Standard';
+          const cartItems = cartData.cart?.lines || [];
+          const cartProducts = cartItems.map((item: any) => {
+            const variant = item.merchandise;
+            const p = variant.product;
             return {
-              id: p.id,
+              id: variant.id,
               title: p.title,
-              icon: p.icon || CATEGORY_ICON[p.tags?.[0]] || '🧴',
-              price,
-              mrp,
+              handle: p.handle,
+              icon: p.featuredImage?.url || CATEGORY_ICON[p.tags?.[0]] || '🧴',
+              price: parseFloat(item.cost.totalAmount.amount) / item.quantity,
+              mrp: (parseFloat(item.cost.totalAmount.amount) / item.quantity) * 1.3,
               tags: p.tags || [],
-              vol,
-              rating: p.rating || 4.5,
-              ratingCount: p.ratingCount || 120,
-              badge: p.badge,
-              qty: p.qty,
+              vol: variant.title || 'Standard',
+              rating: 4.5,
+              ratingCount: 120,
+              qty: item.quantity,
             } as CartItem;
           });
           setCart(cartProducts);
@@ -207,7 +221,11 @@ export default function FreshGuardStore({ initialCategory = 'all', hideHero = fa
   };
 
   useEffect(() => {
-    if (searchQuery === '') return;
+    if (searchQuery === '') {
+      // Reset to full product list when search is cleared
+      fetchProducts(activeCategory, '');
+      return;
+    }
     const delayDebounceFn = setTimeout(() => {
       fetchProducts(activeCategory, searchQuery);
     }, 500);
@@ -320,8 +338,9 @@ export default function FreshGuardStore({ initialCategory = 'all', hideHero = fa
       // Rollback local state
       setCart(prev => {
         const target = prev.find(c => `${c.id}-${c.vol || 'std'}` === cartKey);
+        // Rollback: if qty was incremented, decrement; if it was a new item, remove it
         if (target && target.qty > 1) return prev.map(c => `${c.id}-${c.vol || 'std'}` === cartKey ? { ...c, qty: c.qty - 1 } : c);
-        return prev.filter(c => `${c.id}-${c.vol || 'std'}` === cartKey);
+        return prev.filter(c => `${c.id}-${c.vol || 'std'}` !== cartKey); // was === (inverted bug)
       });
     }
   };
@@ -343,6 +362,7 @@ export default function FreshGuardStore({ initialCategory = 'all', hideHero = fa
     const token = getAuthToken();
     if (!token) return;
 
+    // Use target.id (raw product ID), not the composite key, for API calls
     if (delta > 0 || (target.qty + delta > 0)) {
       await fetch('/api/cart/add', {
         method: 'POST',
@@ -350,12 +370,12 @@ export default function FreshGuardStore({ initialCategory = 'all', hideHero = fa
           'Content-Type': 'application/json',
           Authorization: `Bearer ${token}`
         },
-        body: JSON.stringify({ productId: id, quantity: delta })
+        body: JSON.stringify({ productId: target.id, quantity: delta })
       });
     }
 
     if (target.qty + delta <= 0) {
-      await fetch(`/api/cart/remove/${id}`, {
+      await fetch(`/api/cart/remove/${target.id}`, {
         method: 'DELETE',
         headers: { Authorization: `Bearer ${token}` }
       });
@@ -381,9 +401,10 @@ export default function FreshGuardStore({ initialCategory = 'all', hideHero = fa
   const cartTotal = Math.round(cart.reduce((a, c) => a + c.price * c.qty, 0) * 100) / 100;
   const cartQty = cart.reduce((a, c) => a + c.qty, 0);
   const delivery = cartTotal >= 299 || cartTotal === 0 ? 0 : 49;
-  const discount = (cartTotal >= 299 && cartTotal > 0) ? 49 : 0;
+  // Removed redundancy: 'discount' was essentially double-counting free shipping
   const upiDiscount = selectedPayment === 'upi' ? Math.round(cartTotal * 0.1) : 0;
-  const grandTotal = Math.max(0, Math.round((cartTotal + delivery - discount - upiDiscount + (selectedPayment === 'cod' ? 49 : 0)) * 100) / 100);
+  const codFee = selectedPayment === 'cod' ? 49 : 0;
+  const grandTotal = Math.max(0, Math.round((cartTotal + delivery - upiDiscount + codFee) * 100) / 100);
 
   // ── Wishlist ──
   const toggleWishlist = async (p: Product) => {
@@ -461,10 +482,14 @@ export default function FreshGuardStore({ initialCategory = 'all', hideHero = fa
           description: 'Cleaning Products Order',
           theme: { color: '#0a6ebd' },
           handler: async (response: any) => {
-            // Update order to paid
+            // Update order to paid — include user auth token so the API allows it
+            const patchToken = getAuthToken();
             await fetch('/api/orders', {
               method: 'PATCH',
-              headers: { 'Content-Type': 'application/json' },
+              headers: {
+                'Content-Type': 'application/json',
+                ...(patchToken ? { Authorization: `Bearer ${patchToken}` } : {})
+              },
               body: JSON.stringify({
                 orderId: response.razorpay_order_id,
                 status: 'paid',
@@ -535,7 +560,8 @@ export default function FreshGuardStore({ initialCategory = 'all', hideHero = fa
 
   return (
     <>
-      <script src="https://checkout.razorpay.com/v1/checkout.js" async />
+      {/* Use next/script so the Razorpay SDK actually executes in the browser */}
+      <Script src="https://checkout.razorpay.com/v1/checkout.js" strategy="lazyOnload" />
 
       {/* ── NAV ── */}
       <nav>
@@ -552,7 +578,8 @@ export default function FreshGuardStore({ initialCategory = 'all', hideHero = fa
               onChange={e => handleSearch(e.target.value)}
               placeholder="Search for floor cleaner, glass cleaner..."
             />
-            <button onClick={() => handleSearch(searchQuery)}>🔍 Search</button>
+            {/* Force a refetch instead of calling handleSearch which no-ops on unchanged query */}
+            <button onClick={() => fetchProducts(activeCategory, searchQuery)}>🔍 Search</button>
           </div>
           <div className="nav-actions">
             
@@ -741,12 +768,11 @@ export default function FreshGuardStore({ initialCategory = 'all', hideHero = fa
             </div>
             <div className="deals-grid">
               {[
-                { id: '99', icon: '🧴', name: 'Mega Floor Pack', disc: '43% OFF', price: 399, mrp: 699, tags: ['combo'], vol: '2L×3' },
-                { id: '98', icon: '🚽', name: 'Toilet Bundle', disc: '44% OFF', price: 249, mrp: 449, tags: ['combo'], vol: '1L×3' },
-                { id: '97', icon: '🪟', name: 'Glass Pro Kit', disc: '40% OFF', price: 179, mrp: 299, tags: ['combo'], vol: '500ml×2' },
-                { id: '96', icon: '🏠', name: 'Home Clean Combo', disc: '40% OFF', price: 599, mrp: 999, tags: ['combo'], vol: 'Assorted' },
-                { id: '95', icon: '💜', name: 'Lavender Floor', disc: '45% OFF', price: 99, mrp: 179, tags: ['floor'], vol: '1L' },
-                { id: '94', icon: '💧', name: 'Power Toilet Gel', disc: '40% OFF', price: 89, mrp: 149, tags: ['toilet'], vol: '750ml' },
+                { id: 'ecogreen-all-purpose-cleaner', icon: '🧴', name: 'EcoGreen All-Purpose', disc: '43% OFF', price: 99, mrp: 179, tags: ['eco-friendly'], vol: '500ml' },
+                { id: 'max-power-bathroom-cleaner', icon: '🚽', name: 'Max Power Bathroom', disc: '44% OFF', price: 129, mrp: 229, tags: ['bathroom-cleaners'], vol: 'Spray' },
+                { id: 'crystal-clear-window-cleaner', icon: '🪟', name: 'Crystal Clear Window', disc: '40% OFF', price: 119, mrp: 199, tags: ['window-care'], vol: '1L' },
+                { id: 'industrial-degreaser-pro', icon: '🏠', name: 'Industrial Degreaser', disc: '40% OFF', price: 599, mrp: 999, tags: ['general'], vol: '750ml' },
+                { id: 'purefresh-disinfecting-wipes', icon: '💜', name: 'PureFresh Wipes', disc: '45% OFF', price: 99, mrp: 179, tags: ['general'], vol: '80 Wipes' },
               ].map(deal => (
                 <div key={deal.id} className="deal-card" onClick={() => addToCart({ ...deal, title: deal.name, rating: 4.5, ratingCount: 0, badge: 'Hot' })}>
                   <div className="icon">{deal.icon}</div>
@@ -794,7 +820,19 @@ export default function FreshGuardStore({ initialCategory = 'all', hideHero = fa
                  const vol = p.vol || p.variants?.[0]?.title || 'Standard';
                  const badgeClass = p.badge === 'New' ? 'new' : p.badge ? 'hot' : '';
                  const itemIcon = p.icon || CATEGORY_ICON[p.tags?.[0]] || '🧴';
-                 const product: Product = { id: p.id, title: p.title, icon: itemIcon, price, mrp, tags: p.tags || [], vol, rating: p.rating || 4.5, ratingCount: p.ratingCount || 120, badge: p.badge };
+                 const product: Product = { 
+                    id: p.id, 
+                    title: p.title, 
+                    icon: itemIcon, 
+                    price, 
+                    mrp, 
+                    tags: p.tags || [], 
+                    vol, 
+                    rating: p.rating || 4.5, 
+                    ratingCount: p.ratingCount || 120, 
+                    badge: p.badge,
+                    metadata: p.metadata
+                  };
 
                  return (
                   <div key={p.id} className="prod-card" onClick={() => { setSelectedProduct(product); setModalState('product'); }}>
@@ -809,6 +847,16 @@ export default function FreshGuardStore({ initialCategory = 'all', hideHero = fa
                       <div className="prod-brand">FreshGuard</div>
                       <div className="prod-name">{p.title}</div>
                       <div className="prod-vol">{vol}</div>
+                      {p.metadata?.bundleItems?.length > 0 ? (
+                        <div style={{ color: '#0034de', fontSize: '11px', fontWeight: 'bold', margin: '6px 0', display: 'flex', alignItems: 'center', gap: '4px' }}><span>📦</span> Includes: {p.metadata.bundleItems.join(' + ')}</div>
+                      ) : p.metadata?.bulkQty > 1 ? (
+                        <div style={{ color: '#00c06b', fontSize: '11px', fontWeight: 'bold', margin: '6px 0', display: 'flex', alignItems: 'center', gap: '4px' }}><span>🏭</span> Pack of {p.metadata.bulkQty} Units</div>
+                      ) : (
+                        <div style={{ color: '#94a3b8', fontSize: '10px', margin: '6px 0', display: 'flex', alignItems: 'center', gap: '4px' }}><span>🧴</span> Single Product</div>
+                      )}
+                      {p.metadata?.subDiscount > 0 && (
+                        <div style={{ color: '#8b5cf6', fontSize: '11px', fontWeight: 'bold', margin: '4px 0', display: 'flex', alignItems: 'center', gap: '4px' }}><span>🔁</span> Save {p.metadata.subDiscount}% with Sub</div>
+                      )}
                       {product.rating! > 0 && (
                         <div className="prod-rating">
                           <span className="stars">★ {product.rating}</span>
@@ -897,9 +945,11 @@ export default function FreshGuardStore({ initialCategory = 'all', hideHero = fa
         {wishlist.length > 0 && (
           <div className="cart-footer">
             <button className="checkout-btn" style={{ background: 'var(--primary)' }} onClick={() => { 
-                wishlist.forEach(item => {
+                // Snapshot the wishlist before iteration so mutations don't skip items
+                const snapshot = [...wishlist];
+                snapshot.forEach(item => {
                   addToCart(item);
-                  toggleWishlist(item); // This will handle DB removal
+                  toggleWishlist(item); // Handles DB removal
                 });
                 setWishlistOpen(false); 
                 showToast('All items added to cart!'); 
@@ -931,9 +981,10 @@ export default function FreshGuardStore({ initialCategory = 'all', hideHero = fa
                   <div className="ci-vol">{item.vol}</div>
                   <div className="ci-price">₹{item.price * item.qty}</div>
                   <div className="ci-qty">
-                    <button className="qty-btn" onClick={() => changeQty(item.id, -1)}>−</button>
+                    {/* Must pass composite key to match cart lookup in changeQty */}
+                    <button className="qty-btn" onClick={() => changeQty(`${item.id}-${item.vol || 'std'}`, -1)}>−</button>
                     <div className="qty-num">{item.qty}</div>
-                    <button className="qty-btn" onClick={() => changeQty(item.id, 1)}>+</button>
+                    <button className="qty-btn" onClick={() => changeQty(`${item.id}-${item.vol || 'std'}`, 1)}>+</button>
                     <button className="ci-remove" onClick={() => removeFromCart(item.id)}>🗑 Remove</button>
                   </div>
                 </div>
@@ -1005,7 +1056,7 @@ export default function FreshGuardStore({ initialCategory = 'all', hideHero = fa
                         <div className="form-group"><label>City</label><input type="text" placeholder="City" value={checkoutForm.city} onChange={e => setCheckoutForm({...checkoutForm, city: e.target.value})} /></div>
                         <div className="form-group"><label>PIN Code</label><input type="text" maxLength={6} placeholder="6-digit PIN" value={checkoutForm.pincode} onChange={e => setCheckoutForm({...checkoutForm, pincode: e.target.value})} /></div>
                       </div>
-                      <div className="form-group"><label>State</label><select value={checkoutForm.state} onChange={e => setCheckoutForm({...checkoutForm, state: e.target.value})}><option>Uttar Pradesh</option><option>Maharashtra</option><option>Delhi</option></select></div>
+                      <div className="form-group"><label>State</label><select value={checkoutForm.state} onChange={e => setCheckoutForm({...checkoutForm, state: e.target.value})}><option>Uttar Pradesh</option><option>Maharashtra</option><option>Delhi</option><option>Karnataka</option><option>Tamil Nadu</option><option>Gujarat</option><option>West Bengal</option><option>Punjab</option><option>Haryana</option><option>Other</option></select></div>
                     </div>
                   )}
 
@@ -1032,7 +1083,8 @@ export default function FreshGuardStore({ initialCategory = 'all', hideHero = fa
                         </div>
                       )}
                       {selectedPayment === 'cod' && (
-                        <p style={{ fontSize: 13, background: '#fff8f0', padding: 12, borderRadius: 8, borderLeft: '4px solid #ff6d00' }}>💵 Pay ₹{grandTotal + 49} cash upon delivery. Note: COD fee of ₹49 applicable.</p>
+                        // grandTotal already includes the ₹49 COD fee — don't add it again
+                        <p style={{ fontSize: 13, background: '#fff8f0', padding: 12, borderRadius: 8, borderLeft: '4px solid #ff6d00' }}>💵 Pay ₹{grandTotal} cash upon delivery. Note: COD fee of ₹49 is included.</p>
                       )}
                     </>
                   )}
@@ -1047,7 +1099,7 @@ export default function FreshGuardStore({ initialCategory = 'all', hideHero = fa
                         </div>
                       ))}
                       <div className="os-item"><span>Delivery</span><span>{delivery === 0 ? 'FREE' : `₹${delivery}`}</span></div>
-                      <div className="os-item" style={{ color: 'var(--success)' }}><span>Combo Discount</span><span>-₹{discount}</span></div>
+                      <div className="os-item" style={{ color: 'var(--success)' }}><span>Free Shipping</span><span>{delivery === 0 ? '-₹49' : '₹0'}</span></div>
                       {upiDiscount > 0 && <div className="os-item" style={{ color: 'var(--success)' }}><span>UPI Off (10%)</span><span>-₹{upiDiscount}</span></div>}
                       {selectedPayment === 'cod' && <div className="os-item" style={{ color: '#ef4444' }}><span>COD Fee</span><span>+₹49</span></div>}
                       <div className="os-total"><span>Total Payable</span><span>₹{grandTotal}</span></div>

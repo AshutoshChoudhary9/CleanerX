@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import connectToDatabase from 'lib/mongodb/db';
-import UserCart from 'lib/mongodb/models/UserCart';
+import { removeFromCart } from 'lib/mongodb';
 import { requireAuth } from 'lib/middleware/auth';
 
 type Params = {
@@ -12,16 +11,11 @@ export async function DELETE(req: NextRequest, { params }: Params) {
   if (error) return error;
 
   try {
-    await connectToDatabase();
     const { productId } = await params;
+    // central removeFromCart handles merchandiseId (which is what productId refers to here)
+    const cart = await removeFromCart([productId], user.userId);
 
-    const cart = await UserCart.findOneAndUpdate(
-      { userId: user.userId },
-      { $pull: { products: { productId } } },
-      { returnDocument: 'after' }
-    ).lean();
-
-    return NextResponse.json({ cart: cart || { userId: user.userId, products: [] } });
+    return NextResponse.json({ cart });
   } catch (err) {
     console.error('Cart Remove API Error:', err);
     return NextResponse.json({ error: 'Failed to remove from cart' }, { status: 500 });

@@ -3,7 +3,11 @@ import { getCart } from 'lib/mongodb';
 
 export async function GET(req: NextRequest) {
   try {
-    const cart = await getCart();
+    const authHeader = req.headers.get('authorization');
+    const token = authHeader?.startsWith('Bearer ') ? authHeader.slice(7) : undefined;
+    
+    const cart = await getCart(token);
+    
     return NextResponse.json({
       cart: cart || { lines: [], cost: { totalAmount: { amount: '0.00', currencyCode: 'INR' } }, totalQuantity: 0 }
     });

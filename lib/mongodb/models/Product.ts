@@ -81,7 +81,11 @@ const ProductSchema: Schema = new Schema({
     description: String
   },
   tags: [String],
-  updatedAt: { type: String, default: () => new Date().toISOString() }
+  metadata: {
+    bundleItems: [String],
+    bulkQty: Number,
+    subDiscount: Number
+  }
 }, { timestamps: true });
 
 export default mongoose.models.Product || mongoose.model<IProduct>('Product', ProductSchema);

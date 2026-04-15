@@ -2,15 +2,17 @@ import { NextRequest, NextResponse } from 'next/server';
 import connectToDatabase from 'lib/mongodb/db';
 import Order from 'lib/mongodb/models/Order';
 import mongoose from 'mongoose';
+import { requireAuth } from 'lib/middleware/auth';
+import { verifyAuthToken } from 'lib/auth/jwt';
 
 export async function GET(req: NextRequest) {
   try {
     await connectToDatabase();
     
-    // Simple admin authorization check
+    // Admin authorization check
     const authHeader = req.headers.get('authorization');
-    const adminPass = process.env.ADMIN_PASSWORD || 'admin123';
-    if (authHeader !== `Bearer ${adminPass}`) {
+    const adminPass = process.env.ADMIN_PASSWORD;
+    if (!adminPass || authHeader !== `Bearer ${adminPass}`) {
       return NextResponse.json({ error: 'Unauthorized access' }, { status: 401 });
     }
 
@@ -25,6 +27,10 @@ export async function GET(req: NextRequest) {
 import Product from 'lib/mongodb/models/Product';
 
 export async function POST(req: NextRequest) {
+  // Require a logged-in user to create an order
+  const { user, error } = requireAuth(req);
+  if (error) return error;
+
   try {
     await connectToDatabase();
     const body = await req.json();
@@ -62,6 +68,7 @@ export async function POST(req: NextRequest) {
     const finalTotal = Math.max(0, serverTotal + delivery - comboDiscount - upiDiscount + codFee);
 
     const order = new Order({
+      userId: user.userId, // Link order to the logged-in user
       customerName,
       email,
       mobile,
@@ -87,10 +94,21 @@ export async function POST(req: NextRequest) {
 export async function PATCH(req: NextRequest) {
   try {
     const authHeader = req.headers.get('authorization');
-    const adminPass = process.env.ADMIN_PASSWORD || 'admin123';
-    // For payments, we could also verify with a Razorpay webhook/secret if needed
-    if (authHeader !== `Bearer ${adminPass}`) {
-       return NextResponse.json({ error: 'Unauthorized access' }, { status: 401 });
+    const adminPass = process.env.ADMIN_PASSWORD;
+
+    // Accept either admin token OR a valid user JWT (allows Razorpay callback to update status)
+    let isAuthorized = adminPass && authHeader === `Bearer ${adminPass}`;
+    if (!isAuthorized && authHeader?.startsWith('Bearer ')) {
+      try {
+        verifyAuthToken(authHeader.slice(7));
+        isAuthorized = true;
+      } catch {
+        // Invalid token — fall through to 401
+      }
+    }
+
+    if (!isAuthorized) {
+      return NextResponse.json({ error: 'Unauthorized access' }, { status: 401 });
     }
 
     await connectToDatabase();

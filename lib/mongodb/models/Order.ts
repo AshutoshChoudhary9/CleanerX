@@ -1,6 +1,7 @@
-import mongoose, { Schema, Document } from 'mongoose';
+import mongoose, { Schema, Document, Types } from 'mongoose';
 
 export interface IOrder extends Document {
+  userId?: Types.ObjectId;
   orderId: string;
   customerName: string;
   email: string;
@@ -26,6 +27,7 @@ export interface IOrder extends Document {
 }
 
 const OrderSchema: Schema = new Schema({
+  userId: { type: Schema.Types.ObjectId, ref: 'User', index: true }, // optional for guest orders
   orderId: { type: String, required: true, unique: true },
   customerName: { type: String, required: true },
   email: { type: String },
@@ -50,3 +52,4 @@ const OrderSchema: Schema = new Schema({
 }, { timestamps: true });
 
 export default mongoose.models.Order || mongoose.model<IOrder>('Order', OrderSchema);
+

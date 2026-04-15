@@ -20,12 +20,17 @@ export default function AdminDashboard() {
     category: 'floor',
     fragrance: '',
     description: '',
-    volume: '1 Litre'
+    volume: '1 Litre',
+    tags: '',
+    itemCount: '',
+    bundleItems: '',
+    subDiscount: ''
   });
 
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();
-    if (password === 'admin123') {
+    const expectedPass = process.env.NEXT_PUBLIC_ADMIN_PASSWORD || 'Ashutosh143';
+    if (password.trim() === expectedPass.trim()) {
       setAuthorized(true);
       fetchData();
     } else {
@@ -56,20 +61,32 @@ export default function AdminDashboard() {
     e.preventDefault();
     setLoading(true);
     try {
+      const metadataToSave: any = {};
+      const itemCount = parseInt(productForm.itemCount);
+      if (itemCount > 0) metadataToSave.bulkQty = itemCount;
+      if (productForm.bundleItems.trim()) metadataToSave.bundleItems = productForm.bundleItems.split(',').map(s => s.trim()).filter(Boolean);
+      const subDisc = parseInt(productForm.subDiscount);
+      if (subDisc > 0) metadataToSave.subDiscount = subDisc;
+
       const res = await fetch('/api/products', {
         method: 'POST',
         headers: { 
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${password}`
         },
-        body: JSON.stringify(productForm)
+        body: JSON.stringify({ 
+          ...productForm, 
+          tags: productForm.tags,
+          metadata: metadataToSave
+        })
       });
       if (res.ok) {
         alert('Product added successfully');
         setIsAddingProduct(false);
         setProductForm({
           name: '', price: '', mrp: '', category: 'floor',
-          fragrance: '', description: '', volume: '1 Litre'
+          fragrance: '', description: '', volume: '1 Litre', tags: '',
+          itemCount: '', bundleItems: '', subDiscount: ''
         });
         fetchData();
       } else {
@@ -89,6 +106,14 @@ export default function AdminDashboard() {
     if (!editingProduct) return;
     const formData = new FormData(e.currentTarget);
     try {
+      const metadata: any = {};
+      const bulkQty = parseInt(formData.get('bulkQty') as string);
+      if (bulkQty > 0) metadata.bulkQty = bulkQty;
+      const bundleItems = (formData.get('bundleItems') as string);
+      if (bundleItems) metadata.bundleItems = bundleItems.split(',').map(s => s.trim()).filter(Boolean);
+      const subDiscount = parseInt(formData.get('subDiscount') as string);
+      if (subDiscount > 0) metadata.subDiscount = subDiscount;
+
       const res = await fetch('/api/products', {
         method: 'PUT',
         headers: { 
@@ -100,8 +125,9 @@ export default function AdminDashboard() {
           title: formData.get('title'),
           price: formData.get('price'),
           mrp: formData.get('mrp'),
-          tags: [formData.get('tags')],
+          tags: (formData.get('tags') as string).split(',').map(t => t.trim()).filter(Boolean),
           vol: formData.get('vol'),
+          metadata
         })
       });
       if (res.ok) {
@@ -171,15 +197,13 @@ export default function AdminDashboard() {
     .btn-add { background: #00c06b; color: white; border: none; padding: 10px 20px; border-radius: 8px; font-weight: bold; cursor: pointer; }
     .btn-edit { color: #0034de; background: none; border: none; font-weight: 600; cursor: pointer; margin-right: 12px; }
     .btn-delete { color: #ef4444; background: none; border: none; font-weight: 600; cursor: pointer; }
-    .status-badge { padding: 4px 8px; border-radius: 4px; font-size: 11px; font-weight: 800; text-transform: uppercase; }
-    .status-badge.paid { background: #dcfce7; color: #166534; }
-    .status-badge.pending { background: #fef9c3; color: #854d0e; }
-    .status-badge.failed { background: #fee2e2; color: #991b1b; }
-    .admin-modal { position: fixed; inset: 0; background: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center; z-index: 1000; }
-    .modal-content { background: white; padding: 32px; border-radius: 16px; width: 400px; max-width: 90vw; }
+    .admin-modal { position: fixed; inset: 0; background: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center; z-index: 1000; overflow-y: auto; }
+    .modal-content { background: white; padding: 32px; border-radius: 16px; width: 500px; max-width: 95vw; margin-top: 50px; margin-bottom: 50px; }
     .field { margin-bottom: 16px; }
-    .field label { display: block; font-size: 13px; margin-bottom: 6px; color: #64748b; }
-    .field input, .field select { width: 100%; padding: 10px; border: 1px solid #e2e8f0; border-radius: 8px; }
+    .field label { display: block; font-size: 13px; margin-bottom: 6px; color: #64748b; font-weight: 600; }
+    .field input, .field select, .field textarea { width: 100%; padding: 10px; border: 1px solid #e2e8f0; border-radius: 8px; font-size: 14px; }
+    .special-offer-box { background: #f0f7ff; padding: 16px; border-radius: 8px; border: 1px dashed #0034de; margin: 12px 0; }
+    .special-offer-box h4 { margin: 0 0 10px 0; color: #0034de; font-size: 14px; }
     .grid-fields { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
     .modal-actions { display: flex; justify-content: flex-end; gap: 12px; margin-top: 24px; }
     .btn-save { background: #0034de; color: white; border: none; padding: 10px 20px; border-radius: 8px; font-weight: bold; cursor: pointer; }
@@ -239,7 +263,6 @@ export default function AdminDashboard() {
                       <th>Category</th>
                       <th>Price</th>
                       <th>MRP</th>
-                      <th>Status</th>
                       <th>Actions</th>
                     </tr>
                   </thead>
@@ -250,7 +273,6 @@ export default function AdminDashboard() {
                         <td>{p.tags?.[0] || 'Uncategorized'}</td>
                         <td>₹{p.price || p.priceRange?.minVariantPrice?.amount}</td>
                         <td>₹{p.mrp || p.priceRange?.maxVariantPrice?.amount}</td>
-                        <td><span className="badge-active">In Stock</span></td>
                         <td>
                           <button className="btn-edit" onClick={() => setEditingProduct(p)}>Edit</button>
                           <button className="btn-delete" onClick={() => handleDeleteProduct(p.id)}>Delete</button>
@@ -266,26 +288,17 @@ export default function AdminDashboard() {
               <div className="orders-view">
                 <div className="header">
                   <h2>Order History</h2>
-                  <div className="filters">
-                    <select value={orderFilter} onChange={e => setOrderFilter(e.target.value as any)}>
-                      <option value="all">All Orders</option>
-                      <option value="pending">Pending</option>
-                      <option value="paid">Paid</option>
-                      <option value="failed">Failed</option>
-                    </select>
-                  </div>
+                  <select value={orderFilter} onChange={e => setOrderFilter(e.target.value as any)}>
+                    <option value="all">All Orders</option>
+                    <option value="pending">Pending</option>
+                    <option value="paid">Paid</option>
+                    <option value="failed">Failed</option>
+                  </select>
                 </div>
-                {orders.filter(o => orderFilter === 'all' || o.paymentStatus === orderFilter).length === 0 ? <p>No orders found for this filter.</p> : (
+                {orders.filter(o => orderFilter === 'all' || o.paymentStatus === orderFilter).length === 0 ? <p>No orders found.</p> : (
                   <table>
                     <thead>
-                      <tr>
-                        <th>Order ID</th>
-                        <th>Customer</th>
-                        <th>Items</th>
-                        <th>Amount</th>
-                        <th>Status</th>
-                        <th>Actions</th>
-                      </tr>
+                      <tr><th>Order ID</th><th>Customer</th><th>Items</th><th>Amount</th><th>Status</th><th>Actions</th></tr>
                     </thead>
                     <tbody>
                       {orders.map(o => (
@@ -294,19 +307,10 @@ export default function AdminDashboard() {
                           <td>{o.customerName}<br/><small>{o.mobile}</small></td>
                           <td>{o.items?.length} items</td>
                           <td>₹{o.totalAmount}</td>
+                          <td><span className={`status-badge ${o.paymentStatus}`}>{o.paymentStatus}</span></td>
                           <td>
-                            <span className={`status-badge ${o.paymentStatus}`}>
-                              {o.paymentStatus}
-                            </span>
-                          </td>
-                          <td>
-                            <select 
-                              value={o.paymentStatus} 
-                              onChange={(e) => updateOrderStatus(o._id, e.target.value)}
-                            >
-                              <option value="pending">Pending</option>
-                              <option value="paid">Paid</option>
-                              <option value="failed">Failed</option>
+                            <select value={o.paymentStatus} onChange={(e) => updateOrderStatus(o._id, e.target.value)}>
+                              <option value="pending">Pending</option><option value="paid">Paid</option><option value="failed">Failed</option>
                             </select>
                           </td>
                         </tr>
@@ -325,26 +329,21 @@ export default function AdminDashboard() {
           <div className="modal-content">
             <h3>Edit Product: {editingProduct.title}</h3>
             <form onSubmit={handleUpdateProduct}>
-              <div className="field">
-                <label>Title</label>
-                <input type="text" name="title" defaultValue={editingProduct.title} required />
+              <div className="field"><label>Title</label><input type="text" name="title" defaultValue={editingProduct.title} required /></div>
+              <div className="grid-fields">
+                <div className="field"><label>Price (₹)</label><input type="number" name="price" defaultValue={editingProduct.price || editingProduct.priceRange?.minVariantPrice?.amount} required /></div>
+                <div className="field"><label>MRP (₹)</label><input type="number" name="mrp" defaultValue={editingProduct.mrp || editingProduct.priceRange?.maxVariantPrice?.amount} required /></div>
               </div>
-              <div className="field">
-                <label>Price (₹)</label>
-                <input type="number" name="price" defaultValue={editingProduct.price || editingProduct.priceRange?.minVariantPrice?.amount} required />
+              <div className="field"><label>Category Tags (comma separated)</label><input type="text" name="tags" defaultValue={editingProduct.tags?.join(', ')} required /></div>
+              
+              <div className="special-offer-box">
+                <h4>📊 Product Quantity / Deal Info</h4>
+                <div className="field"><label>How many items does this product contain?</label><input type="number" name="bulkQty" defaultValue={editingProduct.metadata?.bulkQty} placeholder="e.g. 10, 20, 50 (leave empty for single product)" /></div>
+                <div className="field"><label>Included Items (comma separated, for combos)</label><input type="text" name="bundleItems" defaultValue={editingProduct.metadata?.bundleItems?.join(', ')} placeholder="e.g. Floor Cleaner 1L, Toilet Cleaner 500ml" /></div>
+                <div className="field"><label>Extra Discount Percentage (%, for subscriptions)</label><input type="number" name="subDiscount" defaultValue={editingProduct.metadata?.subDiscount} placeholder="e.g. 15" /></div>
               </div>
-              <div className="field">
-                <label>MRP (₹)</label>
-                <input type="number" name="mrp" defaultValue={editingProduct.mrp || editingProduct.priceRange?.maxVariantPrice?.amount} required />
-              </div>
-              <div className="field">
-                <label>Category Tag</label>
-                <input type="text" name="tags" defaultValue={editingProduct.tags?.[0]} required />
-              </div>
-              <div className="field">
-                <label>Volume/Size</label>
-                <input type="text" name="vol" defaultValue={editingProduct.vol} required />
-              </div>
+
+              <div className="field"><label>Volume/Size</label><input type="text" name="vol" defaultValue={editingProduct.vol} required /></div>
               <div className="modal-actions">
                 <button type="button" onClick={() => setEditingProduct(null)}>Cancel</button>
                 <button type="submit" className="btn-save">Save Changes</button>
@@ -359,71 +358,35 @@ export default function AdminDashboard() {
           <div className="modal-content">
             <h3>Add New Product</h3>
             <form onSubmit={handleAddProduct}>
-              <div className="field">
-                <label>Product Name</label>
-                <input 
-                  type="text" 
-                  value={productForm.name} 
-                  onChange={e => setProductForm({...productForm, name: e.target.value})} 
-                  placeholder="e.g. Lavender Floor Cleaner"
-                  required 
-                />
+              <div className="field"><label>Product Name</label><input type="text" value={productForm.name} onChange={e => setProductForm({...productForm, name: e.target.value})} placeholder="e.g. Lavender Floor Cleaner" required /></div>
+              <div className="grid-fields">
+                <div className="field"><label>Price (₹)</label><input type="number" value={productForm.price} onChange={e => setProductForm({...productForm, price: e.target.value})} required /></div>
+                <div className="field"><label>MRP (₹)</label><input type="number" value={productForm.mrp} onChange={e => setProductForm({...productForm, mrp: e.target.value})} /></div>
               </div>
               <div className="grid-fields">
-                <div className="field">
-                  <label>Price (₹)</label>
-                  <input 
-                    type="number" 
-                    value={productForm.price} 
-                    onChange={e => setProductForm({...productForm, price: e.target.value})} 
-                    required 
-                  />
-                </div>
-                <div className="field">
-                  <label>MRP (₹)</label>
-                  <input 
-                    type="number" 
-                    value={productForm.mrp} 
-                    onChange={e => setProductForm({...productForm, mrp: e.target.value})} 
-                  />
-                </div>
-              </div>
-              <div className="grid-fields">
-                <div className="field">
-                  <label>Category</label>
-                  <select 
-                    value={productForm.category} 
-                    onChange={e => setProductForm({...productForm, category: e.target.value})}
-                  >
-                    <option value="floor">Floor Cleaner</option>
-                    <option value="toilet">Toilet Cleaner</option>
-                    <option value="glass">Glass Cleaner</option>
-                    <option value="combo">Combo Pack</option>
+                <div className="field"><label>Category</label>
+                  <select value={productForm.category} onChange={e => setProductForm({...productForm, category: e.target.value})}>
+                    <option value="floor">Floor Cleaner</option><option value="toilet">Toilet Cleaner</option><option value="glass">Glass Cleaner</option>
+                    <option value="combo">Combo Pack</option><option value="bulk">Bulk Order Page</option><option value="festive">Festive Deals Page</option><option value="subscribe">Subscribe & Save Page</option>
                   </select>
                 </div>
-                <div className="field">
-                  <label>Volume</label>
-                  <input 
-                    type="text" 
-                    value={productForm.volume} 
-                    onChange={e => setProductForm({...productForm, volume: e.target.value})} 
-                    placeholder="1 Litre"
-                  />
-                </div>
+                <div className="field"><label>Volume</label><input type="text" value={productForm.volume} onChange={e => setProductForm({...productForm, volume: e.target.value})} placeholder="1 Litre" /></div>
               </div>
-              <div className="field">
-                <label>Fragrance (optional)</label>
-                <input 
-                  type="text" 
-                  value={productForm.fragrance} 
-                  onChange={e => setProductForm({...productForm, fragrance: e.target.value})} 
-                />
+
+              <div className="special-offer-box">
+                <h4>📊 Product Quantity / Deal Info</h4>
+                <div className="field"><label>How many items does this product contain?</label><input type="number" value={productForm.itemCount} onChange={e => setProductForm({...productForm, itemCount: e.target.value})} placeholder="e.g. 10, 20, 50 (leave empty for single product)" /></div>
+                <div className="field"><label>Included Items (comma separated, for combos)</label><input type="text" value={productForm.bundleItems} onChange={e => setProductForm({...productForm, bundleItems: e.target.value})} placeholder="e.g. Floor Cleaner 1L, Toilet Cleaner 500ml" /></div>
+                {productForm.category === 'subscribe' && (
+                  <div className="field"><label>Subscriber Discount (%)</label><input type="number" value={productForm.subDiscount} onChange={e => setProductForm({...productForm, subDiscount: e.target.value})} placeholder="e.g. 10" /></div>
+                )}
               </div>
+
+              <div className="field"><label>Fragrance (optional)</label><input type="text" value={productForm.fragrance} onChange={e => setProductForm({...productForm, fragrance: e.target.value})} /></div>
+              <div className="field"><label>Additional Tags</label><input type="text" value={productForm.tags} onChange={e => setProductForm({...productForm, tags: e.target.value})} placeholder="comma separated" /></div>
               <div className="modal-actions">
                 <button type="button" onClick={() => setIsAddingProduct(false)}>Cancel</button>
-                <button type="submit" className="btn-save" disabled={loading}>
-                  {loading ? 'Adding...' : 'Add Product'}
-                </button>
+                <button type="submit" className="btn-save" disabled={loading}>{loading ? 'Adding...' : 'Add Product'}</button>
               </div>
             </form>
           </div>

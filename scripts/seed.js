@@ -45,6 +45,11 @@ const ProductSchema = new mongoose.Schema({
     description: String
   },
   tags: [String],
+  metadata: {
+    bundleItems: [String],
+    bulkQty: Number,
+    subDiscount: Number
+  },
   updatedAt: { type: String, default: () => new Date().toISOString() }
 });
 
@@ -240,6 +245,62 @@ const sampleProducts = [
     }],
     seo: { title: 'PureFresh Disinfecting Wipes', description: 'Antibacterial cleaning wipes.' },
     tags: ['bathroom-cleaners', 'general', 'hidden-homepage-featured-items']
+  },
+  {
+    handle: 'home-essentials-combo-pack',
+    title: 'Home Essentials Combo Pack',
+    description: 'All-in-one cleaning solution for your home.',
+    descriptionHtml: '<p>All-in-one cleaning solution for your home.</p>',
+    options: [{ id: 'bundle', name: 'Bundle', values: ['3-Pack'] }],
+    priceRange: { minVariantPrice: { amount: '19.99', currencyCode: 'USD' }, maxVariantPrice: { amount: '19.99', currencyCode: 'USD' } },
+    variants: [{ id: 'var-combo-3', title: '3-Pack', availableForSale: true, selectedOptions: [{ name: 'Bundle', value: '3-Pack' }], price: { amount: '19.99', currencyCode: 'USD' } }],
+    featuredImage: { url: 'https://images.unsplash.com/photo-1584622650111-993a426fbf0a?auto=format&fit=crop&q=80&w=800', altText: 'Combo Pack', width: 800, height: 800 },
+    images: [],
+    seo: { title: 'Combo Offers', description: 'Save more with bundles.' },
+    tags: ['combo'],
+    metadata: { bundleItems: ['Classic Floor 1L', 'HyperClean Toilet 750ml', 'ClearView Glass 500ml'] }
+  },
+  {
+    handle: 'bulk-floor-disinfectant-20l',
+    title: 'Bulk Industrial Floor Disinfectant',
+    description: 'Large 20L drum for industrial use.',
+    descriptionHtml: '<p>Large 20L drum for industrial use.</p>',
+    options: [{ id: 'size', name: 'Size', values: ['20L'] }],
+    priceRange: { minVariantPrice: { amount: '89.99', currencyCode: 'USD' }, maxVariantPrice: { amount: '89.99', currencyCode: 'USD' } },
+    variants: [{ id: 'var-bulk-20', title: '20L', availableForSale: true, selectedOptions: [{ name: 'Size', value: '20L' }], price: { amount: '89.99', currencyCode: 'USD' } }],
+    featuredImage: { url: 'https://images.unsplash.com/photo-1584622650111-993a426fbf0a?auto=format&fit=crop&q=80&w=800', altText: 'Bulk Order', width: 800, height: 800 },
+    images: [],
+    seo: { title: 'Bulk Orders', description: 'Industrial cleaning supplies.' },
+    tags: ['bulk'],
+    metadata: { bulkQty: 20 }
+  },
+  {
+    handle: 'festive-sparkle-limited-edition',
+    title: 'Festive Shine Limited Edition',
+    description: 'Special edition cleaner for the holiday season.',
+    descriptionHtml: '<p>Special edition cleaner for the holiday season.</p>',
+    options: [{ id: 'edition', name: 'Edition', values: ['Limited'] }],
+    priceRange: { minVariantPrice: { amount: '14.99', currencyCode: 'USD' }, maxVariantPrice: { amount: '14.99', currencyCode: 'USD' } },
+    variants: [{ id: 'var-festive-lim', title: 'Limited', availableForSale: true, selectedOptions: [{ name: 'Edition', value: 'Limited' }], price: { amount: '14.99', currencyCode: 'USD' } }],
+    featuredImage: { url: 'https://images.unsplash.com/photo-1550963295-019d8a8a315e?auto=format&fit=crop&q=80&w=800', altText: 'Festive Deal', width: 800, height: 800 },
+    images: [],
+    seo: { title: 'Festive Deals', description: 'Holiday specials.' },
+    tags: ['festive'],
+    metadata: { bundleItems: ['Gold Edition Sparkle', 'Microfiber Cloth'] }
+  },
+  {
+    handle: 'monthly-protection-membership',
+    title: 'Monthly Protection Plan',
+    description: 'A recurring subscription for your cleaning needs.',
+    descriptionHtml: '<p>A recurring subscription for your cleaning needs.</p>',
+    options: [{ id: 'plan', name: 'Plan', values: ['Monthly'] }],
+    priceRange: { minVariantPrice: { amount: '24.99', currencyCode: 'USD' }, maxVariantPrice: { amount: '24.99', currencyCode: 'USD' } },
+    variants: [{ id: 'var-sub-monthly', title: 'Monthly', availableForSale: true, selectedOptions: [{ name: 'Plan', value: 'Monthly' }], price: { amount: '24.99', currencyCode: 'USD' } }],
+    featuredImage: { url: 'https://images.unsplash.com/photo-1563453392212-326f5e854473?auto=format&fit=crop&q=80&w=800', altText: 'Subscription', width: 800, height: 800 },
+    images: [],
+    seo: { title: 'Subscribe & Save', description: 'Never run out of supplies.' },
+    tags: ['subscribe'],
+    metadata: { subDiscount: 15 }
   }
 ];
 

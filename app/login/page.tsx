@@ -116,7 +116,7 @@ function LoginContent() {
         </Link>
       </div>
 
-      <style jsx>{`
+      <style dangerouslySetInnerHTML={{ __html: `
         .auth-page {
           min-height: 100vh;
           display: grid;
@@ -134,7 +134,7 @@ function LoginContent() {
           box-shadow: 0 18px 44px rgba(15, 23, 42, 0.08);
         }
 
-        h1 {
+        .auth-card h1 {
           margin: 0;
           color: #0f172a;
           font-size: 28px;
@@ -151,7 +151,7 @@ function LoginContent() {
           gap: 14px;
         }
 
-        label {
+        .auth-form label {
           display: grid;
           gap: 6px;
           font-size: 13px;
@@ -159,7 +159,7 @@ function LoginContent() {
           font-weight: 600;
         }
 
-        input {
+        .auth-form input {
           border: 1px solid #d1d5db;
           border-radius: 10px;
           padding: 10px 12px;
@@ -167,12 +167,12 @@ function LoginContent() {
           outline: none;
         }
 
-        input:focus {
+        .auth-form input:focus {
           border-color: #2563eb;
           box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15);
         }
 
-        button {
+        .auth-form button {
           margin-top: 4px;
           border: 0;
           border-radius: 10px;
@@ -184,7 +184,7 @@ function LoginContent() {
           cursor: pointer;
         }
 
-        button:disabled {
+        .auth-form button:disabled {
           opacity: 0.65;
           cursor: not-allowed;
         }
@@ -214,7 +214,7 @@ function LoginContent() {
           color: #64748b;
           text-decoration: none;
         }
-      `}</style>
+      `}} />
     </main>
   );
 }
