@@ -24,12 +24,18 @@ export default function AdminDashboard() {
     tags: '',
     itemCount: '',
     bundleItems: '',
-    subDiscount: ''
+    subDiscount: '',
+    imageUrl: ''
   });
 
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();
-    const expectedPass = process.env.NEXT_PUBLIC_ADMIN_PASSWORD || 'Ashutosh143';
+    const expectedPass = process.env.NEXT_PUBLIC_ADMIN_PASSWORD;
+    if (!expectedPass) {
+      console.error("ADMIN_PASSWORD is not set in environment variables.");
+      alert("Admin access is not configured. Please set NEXT_PUBLIC_ADMIN_PASSWORD.");
+      return;
+    }
     if (password.trim() === expectedPass.trim()) {
       setAuthorized(true);
       fetchData();
@@ -86,7 +92,7 @@ export default function AdminDashboard() {
         setProductForm({
           name: '', price: '', mrp: '', category: 'floor',
           fragrance: '', description: '', volume: '1 Litre', tags: '',
-          itemCount: '', bundleItems: '', subDiscount: ''
+          itemCount: '', bundleItems: '', subDiscount: '', imageUrl: ''
         });
         fetchData();
       } else {
@@ -127,6 +133,7 @@ export default function AdminDashboard() {
           mrp: formData.get('mrp'),
           tags: (formData.get('tags') as string).split(',').map(t => t.trim()).filter(Boolean),
           vol: formData.get('vol'),
+          imageUrl: formData.get('imageUrl'),
           metadata
         })
       });
@@ -246,7 +253,7 @@ export default function AdminDashboard() {
               <div className="stats-grid">
                 <div className="stat-card"><h3>Total Products</h3><p>{products.length}</p></div>
                 <div className="stat-card"><h3>Total Orders</h3><p>{orders.length}</p></div>
-                <div className="stat-card"><h3>Revenue</h3><p>₹{orders.filter(o => o.paymentStatus === 'paid').reduce((a, b) => a + b.totalAmount, 0)}</p></div>
+                <div className="stat-card"><h3>Revenue</h3><p>₹{orders.filter(o => o.paymentStatus === 'paid').reduce((a, b) => a + (Number(b.totalAmount) || 0), 0)}</p></div>
               </div>
             )}
 
@@ -344,6 +351,7 @@ export default function AdminDashboard() {
               </div>
 
               <div className="field"><label>Volume/Size</label><input type="text" name="vol" defaultValue={editingProduct.vol} required /></div>
+              <div className="field"><label>Image URL</label><input type="text" name="imageUrl" defaultValue={editingProduct.featuredImage?.url || editingProduct.images?.[0]?.url} placeholder="https://..." /></div>
               <div className="modal-actions">
                 <button type="button" onClick={() => setEditingProduct(null)}>Cancel</button>
                 <button type="submit" className="btn-save">Save Changes</button>
@@ -383,6 +391,7 @@ export default function AdminDashboard() {
               </div>
 
               <div className="field"><label>Fragrance (optional)</label><input type="text" value={productForm.fragrance} onChange={e => setProductForm({...productForm, fragrance: e.target.value})} /></div>
+              <div className="field"><label>Image URL</label><input type="text" value={productForm.imageUrl} onChange={e => setProductForm({...productForm, imageUrl: e.target.value})} placeholder="https://images.unsplash.com/..." /></div>
               <div className="field"><label>Additional Tags</label><input type="text" value={productForm.tags} onChange={e => setProductForm({...productForm, tags: e.target.value})} placeholder="comma separated" /></div>
               <div className="modal-actions">
                 <button type="button" onClick={() => setIsAddingProduct(false)}>Cancel</button>

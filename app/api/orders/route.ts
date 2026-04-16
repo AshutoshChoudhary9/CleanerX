@@ -96,14 +96,16 @@ export async function PATCH(req: NextRequest) {
     const authHeader = req.headers.get('authorization');
     const adminPass = process.env.ADMIN_PASSWORD;
 
-    // Accept either admin token OR a valid user JWT (allows Razorpay callback to update status)
+    // Accept either admin token OR a valid user JWT
     let isAuthorized = adminPass && authHeader === `Bearer ${adminPass}`;
+    let authenticatedUser: any = null;
+    
     if (!isAuthorized && authHeader?.startsWith('Bearer ')) {
       try {
-        verifyAuthToken(authHeader.slice(7));
-        isAuthorized = true;
+        authenticatedUser = verifyAuthToken(authHeader.slice(7));
+        isAuthorized = !!authenticatedUser;
       } catch {
-        // Invalid token — fall through to 401
+        // Invalid token
       }
     }
 
@@ -115,7 +117,12 @@ export async function PATCH(req: NextRequest) {
     const body = await req.json();
     const { id, orderId, status, razorpayPaymentId } = body;
     
-    const query = id ? { _id: id } : { orderId: orderId };
+    const query: any = id ? { _id: id } : { orderId: orderId };
+    
+    // If not admin, ensure the order belongs to the user
+    if (adminPass && authHeader !== `Bearer ${adminPass}`) {
+      query.userId = authenticatedUser.userId;
+    }
     const update: any = { paymentStatus: status };
     if (razorpayPaymentId) update.razorpayPaymentId = razorpayPaymentId;
 

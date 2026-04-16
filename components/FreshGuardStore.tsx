@@ -401,10 +401,10 @@ export default function FreshGuardStore({ initialCategory = 'all', hideHero = fa
   const cartTotal = Math.round(cart.reduce((a, c) => a + c.price * c.qty, 0) * 100) / 100;
   const cartQty = cart.reduce((a, c) => a + c.qty, 0);
   const delivery = cartTotal >= 299 || cartTotal === 0 ? 0 : 49;
-  // Removed redundancy: 'discount' was essentially double-counting free shipping
+  const comboDiscount = (cartTotal >= 299 && cartTotal > 0) ? 49 : 0;
   const upiDiscount = selectedPayment === 'upi' ? Math.round(cartTotal * 0.1) : 0;
   const codFee = selectedPayment === 'cod' ? 49 : 0;
-  const grandTotal = Math.max(0, Math.round((cartTotal + delivery - upiDiscount + codFee) * 100) / 100);
+  const grandTotal = Math.max(0, Math.round((cartTotal + delivery - comboDiscount - upiDiscount + codFee) * 100) / 100);
 
   // ── Wishlist ──
   const toggleWishlist = async (p: Product) => {

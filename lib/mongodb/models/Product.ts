@@ -39,6 +39,11 @@ export interface IProduct extends Document {
     description: string;
   };
   tags: string[];
+  metadata?: {
+    bundleItems?: string[];
+    bulkQty?: number;
+    subDiscount?: number;
+  };
   updatedAt: string;
 }
 

@@ -122,8 +122,8 @@ export async function PUT(req: NextRequest) {
 
     await connectToDatabase();
     const body = await req.json();
-    const { id, price, mrp, tags, title, vol } = body;
-
+    const { id, price, mrp, tags, title, vol, imageUrl } = body;
+    
     const update: any = {};
     if (title) update.title = title;
     if (price !== undefined) {
@@ -137,6 +137,10 @@ export async function PUT(req: NextRequest) {
     if (vol) {
       update['variants.0.title'] = vol;
       update['variants.0.selectedOptions.0.value'] = vol;
+    }
+    if (imageUrl) {
+      update['featuredImage.url'] = imageUrl;
+      update['images'] = [{ url: imageUrl, altText: title || 'Product Image', width: 400, height: 400 }];
     }
     if (body.metadata) update.metadata = body.metadata;
 
@@ -179,4 +183,10 @@ const SEED_PRODUCTS = [
   { id: 'bulk-floor-20', handle: 'bulk-floor-20', title: 'Bulk Industrial Floor Disinfectant', icon: '🏭', price: 1299, mrp: 1699, tags: ['bulk'], vol: '20 Litre', rating: 4.8, ratingCount: 124, badge: 'Factory Price', variants: [{ id: 'bulk-20-v', title: '20 Litre', price: { amount: '1299', currencyCode: 'INR' } }] },
   { id: 'festive-sparkle-pack', handle: 'festive-sparkle-pack', title: 'Festive Shine Limited Edition', icon: '🎉', price: 299, mrp: 399, tags: ['festive'], vol: 'Limited Edition', rating: 4.7, ratingCount: 89, badge: 'Seasonal', variants: [{ id: 'festive-v', title: 'Limited Edition', price: { amount: '299', currencyCode: 'INR' } }] },
   { id: 'monthly-protection-sub', handle: 'monthly-protection-sub', title: 'Monthly Protection Membership', icon: '🔁', price: 449, mrp: 549, tags: ['subscribe'], vol: 'Monthly', rating: 5.0, ratingCount: 1205, badge: 'Subscription', variants: [{ id: 'sub-v', title: 'Monthly', price: { amount: '449', currencyCode: 'INR' } }] },
+  // Deal of the Day Products
+  { id: 'ecogreen-all-purpose-cleaner', handle: 'ecogreen-all-purpose-cleaner', title: 'EcoGreen All-Purpose', icon: '🧴', price: 99, mrp: 179, tags: ['eco-friendly', 'floor'], vol: '500ml', rating: 4.5, ratingCount: 10, badge: 'Hot', variants: [{ id: 'ecogreen-v1', title: '500ml', price: { amount: '99', currencyCode: 'INR' } }] },
+  { id: 'max-power-bathroom-cleaner', handle: 'max-power-bathroom-cleaner', title: 'Max Power Bathroom', icon: '🚽', price: 129, mrp: 229, tags: ['bathroom-cleaners', 'toilet'], vol: 'Spray', rating: 4.5, ratingCount: 10, badge: 'Hot', variants: [{ id: 'maxpower-v1', title: 'Spray', price: { amount: '129', currencyCode: 'INR' } }] },
+  { id: 'crystal-clear-window-cleaner', handle: 'crystal-clear-window-cleaner', title: 'Crystal Clear Window', icon: '🪟', price: 119, mrp: 199, tags: ['window-care', 'glass'], vol: '1L', rating: 4.5, ratingCount: 10, badge: 'Hot', variants: [{ id: 'crystal-v1', title: '1L', price: { amount: '119', currencyCode: 'INR' } }] },
+  { id: 'industrial-degreaser-pro', handle: 'industrial-degreaser-pro', title: 'Industrial Degreaser', icon: '🏠', price: 599, mrp: 999, tags: ['general'], vol: '750ml', rating: 4.5, ratingCount: 10, badge: 'Hot', variants: [{ id: 'industrial-v1', title: '750ml', price: { amount: '599', currencyCode: 'INR' } }] },
+  { id: 'purefresh-disinfecting-wipes', handle: 'purefresh-disinfecting-wipes', title: 'PureFresh Wipes', icon: '💜', price: 99, mrp: 179, tags: ['general'], vol: '80 Wipes', rating: 4.5, ratingCount: 10, badge: 'Hot', variants: [{ id: 'wipes-v1', title: '80 Wipes', price: { amount: '99', currencyCode: 'INR' } }] },
 ];

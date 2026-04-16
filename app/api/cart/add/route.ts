@@ -15,7 +15,7 @@ export async function POST(req: NextRequest) {
     }
 
     // Call the centralized addToCart which uses CartModel
-    const cart = await addToCart([{ merchandiseId: productId, quantity }], undefined);
+    const cart = await addToCart([{ merchandiseId: productId, quantity }], user.userId);
 
     return NextResponse.json({ cart });
   } catch (err) {
