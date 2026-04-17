@@ -404,7 +404,8 @@ export default function FreshGuardStore({ initialCategory = 'all', hideHero = fa
   const comboDiscount = (cartTotal >= 299 && cartTotal > 0) ? 49 : 0;
   const upiDiscount = selectedPayment === 'upi' ? Math.round(cartTotal * 0.1) : 0;
   const codFee = selectedPayment === 'cod' ? 49 : 0;
-  const grandTotal = Math.max(0, Math.round((cartTotal + delivery - comboDiscount - upiDiscount + codFee) * 100) / 100);
+  const discount = comboDiscount + upiDiscount;
+  const grandTotal = Math.max(0, Math.round((cartTotal + delivery - discount + codFee) * 100) / 100);
 
   // ── Wishlist ──
   const toggleWishlist = async (p: Product) => {
@@ -586,7 +587,7 @@ export default function FreshGuardStore({ initialCategory = 'all', hideHero = fa
             <div className="signin-wrapper" ref={authRef}>
               <button
                 className="nav-btn"
-                onClick={() => setAuthOpen(!authOpen)}
+                onClick={() => currentUser ? setAuthOpen(!authOpen) : router.push('/login')}
               >
                 <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
@@ -898,9 +899,18 @@ export default function FreshGuardStore({ initialCategory = 'all', hideHero = fa
             <div className="footer-col" key={col.title}>
               <h4>{col.title}</h4>
               <ul>
-                {col.links.map(link => (
-                  <li key={link} onClick={() => showToast(`${link} page coming soon!`)}>{link}</li>
-                ))}
+                {col.links.map(link => {
+                  let href = '#';
+                  if (link === 'About Us') href = '/about';
+                  if (link === 'Privacy Policy') href = '/privacy';
+                  if (link === 'Contact Us') href = '/contact';
+                  if (link === 'Floor Cleaners') href = '/floor-cleaners';
+                  if (link === 'Toilet Cleaners') href = '/toilet-cleaners';
+                  if (link === 'Glass Cleaners') href = '/glass-cleaners';
+                  
+                  if (href !== '#') return <li key={link}><Link href={href} style={{ color: 'inherit', textDecoration: 'none' }}>{link}</Link></li>;
+                  return <li key={link} onClick={() => showToast(`${link} page coming soon!`)}>{link}</li>;
+                })}
               </ul>
             </div>
           ))}

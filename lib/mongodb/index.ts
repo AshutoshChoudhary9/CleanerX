@@ -5,6 +5,7 @@ import CartModel from './models/Cart';
 import Collection from './models/Collection';
 import Product from './models/Product';
 import { verifyAuthToken } from 'lib/auth/jwt';
+import { SEED_PRODUCTS, KNOWN_PAGES } from './seed-data';
 
 export async function getProducts({ query, reverse, sortKey, category }: { query?: string; reverse?: boolean; sortKey?: string; category?: string }): Promise<ProductType[]> {
   await connectToDatabase();
@@ -25,7 +26,8 @@ export async function getProducts({ query, reverse, sortKey, category }: { query
   const products = await Product.find(filter).collation({ locale: 'en_US', numericOrdering: true }).sort(sort).lean();
   
   if (!products.length && !query) {
-    return SEED_PRODUCTS as any;
+    if (!category || category === 'all') return SEED_PRODUCTS as any;
+    return SEED_PRODUCTS.filter(p => p.tags.some(t => t.toLowerCase().includes(category.toLowerCase()))) as any;
   }
 
   return products.map(p => ({
@@ -52,7 +54,9 @@ const SEED_PRODUCTS = [
 export async function getProduct(handle: string): Promise<ProductType | undefined> {
   await connectToDatabase();
   const product = await Product.findOne({ handle }).lean();
-  if (!product) return undefined;
+  if (!product) {
+    return SEED_PRODUCTS.find(p => p.handle === handle) as any;
+  }
   return { ...product, id: product._id.toString(), _id: product._id.toString() } as unknown as ProductType;
 }
 
@@ -115,8 +119,35 @@ export async function getCartById(cartId: string): Promise<Cart | undefined> {
         { 'variants.id': item.merchandiseId }
       ].filter(Boolean)
     }).lean();
-    
-    if (!product) return null;
+
+    if (!product) {
+      // Fallback to seed data
+      const seedP = SEED_PRODUCTS.find(p => p.id === item.merchandiseId || p.handle === item.merchandiseId);
+      if (!seedP) return null;
+      
+      return {
+        id: item.id,
+        quantity: item.quantity,
+        cost: {
+          totalAmount: {
+            amount: (seedP.price * item.quantity).toFixed(2),
+            currencyCode: 'INR'
+          }
+        },
+        merchandise: {
+          id: seedP.id,
+          title: seedP.vol || 'Standard',
+          selectedOptions: [{ name: 'Volume', value: seedP.vol || 'Standard' }],
+          product: {
+            id: seedP.id,
+            handle: seedP.handle,
+            title: seedP.title,
+            featuredImage: { url: seedP.icon || '🧴' },
+            tags: seedP.tags
+          }
+        }
+      };
+    }
 
     let variant = product.variants.find((v: any) => v.id === item.merchandiseId);
     if (!variant && product.variants.length > 0) variant = product.variants[0];
@@ -282,11 +313,7 @@ export async function clearCart(userId?: string): Promise<void> {
   (await cookies()).delete('cartId');
 }
 
-const KNOWN_PAGES: Record<string, { title: string; body: string; handle: string; updatedAt: string }> = {
-  privacy: { title: 'Privacy Policy', body: '<p>Our privacy policy.</p>', handle: 'privacy', updatedAt: new Date().toISOString() },
-  about: { title: 'About Us', body: '<p>About FreshGuard.</p>', handle: 'about', updatedAt: new Date().toISOString() },
-  contact: { title: 'Contact', body: '<p>Contact us at support@freshguard.in</p>', handle: 'contact', updatedAt: new Date().toISOString() },
-};
+// Removed local KNOWN_PAGES definition
 
 export async function getPages() {
   return Object.values(KNOWN_PAGES);

@@ -24,7 +24,7 @@ export async function GET(req: NextRequest) {
   }
 }
 
-import Product from 'lib/mongodb/models/Product';
+import { SEED_PRODUCTS } from 'lib/mongodb/seed-data';
 
 export async function POST(req: NextRequest) {
   // Require a logged-in user to create an order
@@ -47,10 +47,16 @@ export async function POST(req: NextRequest) {
 
     let serverTotal = 0;
     const validatedItems = items.map((item: any) => {
-      const p = dbProducts.find((dbP: any) => dbP._id.toString() === item.id || dbP.handle === item.id);
-      if (!p) throw new Error(`Product not found: ${item.title}`);
+      let p = dbProducts.find((dbP: any) => dbP._id.toString() === item.id || dbP.handle === item.id);
       
-      const price = parseFloat(p.price || p.priceRange?.minVariantPrice?.amount || '0');
+      if (!p) {
+        // Fallback to seed products
+        const seedP = SEED_PRODUCTS.find(sp => sp.id === item.id || sp.handle === item.id);
+        if (!seedP) throw new Error(`Product not found: ${item.title}`);
+        p = seedP as any;
+      }
+      
+      const price = parseFloat(p.price || (p.priceRange?.minVariantPrice?.amount) || '0');
       serverTotal += price * item.qty;
       
       return {
