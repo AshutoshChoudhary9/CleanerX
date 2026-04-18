@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import Razorpay from 'razorpay';
 
+import connectToDatabase from 'lib/mongodb/db';
+import Order from 'lib/mongodb/models/Order';
+
 const razorpay = new Razorpay({
   key_id: process.env.RAZORPAY_KEY_ID!,
   key_secret: process.env.RAZORPAY_KEY_SECRET!,
@@ -9,25 +12,34 @@ const razorpay = new Razorpay({
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    // Frontend sends `amount` directly (grandTotal already computed client-side
-    // and validated server-side in /api/orders). CartId-based flow is kept as fallback.
-    const { amount, currency = 'INR', receipt } = body;
+    const { orderId, currency = 'INR' } = body;
 
-    if (!amount || amount <= 0) {
-      return NextResponse.json({ error: 'A valid amount is required' }, { status: 400 });
+    if (!orderId) {
+      return NextResponse.json({ error: 'orderId is required' }, { status: 400 });
+    }
+
+    await connectToDatabase();
+    const orderDoc = await Order.findOne({ orderId });
+    if (!orderDoc) {
+      return NextResponse.json({ error: 'Order not found' }, { status: 404 });
     }
 
     const options = {
-      amount: Math.round(Number(amount) * 100), // convert ₹ to paise
+      amount: Math.round(Number(orderDoc.totalAmount) * 100), // convert ₹ to paise
       currency,
-      receipt: receipt || `receipt_${Date.now()}`,
+      receipt: orderId,
     };
 
-    const order = await razorpay.orders.create(options);
+    const rzpOrder = await razorpay.orders.create(options);
+    
+    // Update order with razorpayOrderId
+    orderDoc.razorpayOrderId = rzpOrder.id;
+    await orderDoc.save();
+
     return NextResponse.json({
-      orderId: order.id,
-      amount: order.amount,
-      currency: order.currency,
+      orderId: rzpOrder.id,
+      amount: rzpOrder.amount,
+      currency: rzpOrder.currency,
       keyId: process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID,
     });
   } catch (err) {

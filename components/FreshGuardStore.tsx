@@ -449,45 +449,56 @@ export default function FreshGuardStore({ initialCategory = 'all', hideHero = fa
   const placeOrder = async () => {
     if (paying) return;
     setPaying(true);
+    const internalOrderId = `FG${Date.now()}`;
+    
     try {
-      const res = await fetch('/api/razorpay', {
+      const token = getAuthToken();
+      // 1. Pre-save order as pending
+      const orderRes = await fetch('/api/orders', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ amount: grandTotal, receipt: `FG${Date.now()}` }),
+        headers: { 
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {})
+        },
+        body: JSON.stringify({
+          orderId: internalOrderId,
+          customerName: checkoutForm.name,
+          email: checkoutForm.email || currentUser?.email || '',
+          mobile: checkoutForm.mobile,
+          address: checkoutForm.address,
+          city: checkoutForm.city,
+          pincode: checkoutForm.pincode,
+          state: checkoutForm.state,
+          items: cart,
+          totalAmount: grandTotal,
+          paymentMethod: selectedPayment,
+          paymentStatus: 'pending'
+        })
       });
-      const data = await res.json();
 
-      if (data.orderId && typeof window !== 'undefined' && (window as any).Razorpay) {
-        // Pre-save order as pending
-        await fetch('/api/orders', {
+      if (!orderRes.ok) {
+        throw new Error('Failed to create order');
+      }
+
+      if (selectedPayment !== 'cod') {
+        // 2. Create Razorpay order for online payments
+        const rzpRes = await fetch('/api/razorpay', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            orderId: data.orderId,
-            customerName: checkoutForm.name,
-            email: checkoutForm.email || currentUser?.email || '',
-            mobile: checkoutForm.mobile,
-            address: checkoutForm.address,
-            city: checkoutForm.city,
-            pincode: checkoutForm.pincode,
-            state: checkoutForm.state,
-            items: cart,
-            totalAmount: grandTotal,
-            paymentMethod: selectedPayment,
-            paymentStatus: 'pending',
-            razorpayOrderId: data.orderId
-          })
+          body: JSON.stringify({ orderId: internalOrderId }),
         });
+        const data = await rzpRes.json();
 
-        const rzp = new (window as any).Razorpay({
-          key: data.keyId,
-          amount: data.amount,
-          currency: data.currency,
-          order_id: data.orderId,
-          name: 'FreshGuard',
-          description: 'Cleaning Products Order',
-          theme: { color: '#0a6ebd' },
-          handler: async (response: any) => {
+        if (data.orderId && typeof window !== 'undefined' && (window as any).Razorpay) {
+          const rzp = new (window as any).Razorpay({
+            key: data.keyId,
+            amount: data.amount,
+            currency: data.currency,
+            order_id: data.orderId,
+            name: 'FreshGuard',
+            description: 'Cleaning Products Order',
+            theme: { color: '#0a6ebd' },
+            handler: async (response: any) => {
             // Update order to paid — include user auth token so the API allows it
             const patchToken = getAuthToken();
             await fetch('/api/orders', {
@@ -520,29 +531,10 @@ export default function FreshGuardStore({ initialCategory = 'all', hideHero = fa
         });
         rzp.open();
       } else {
-        const orderId = `FG${Date.now().toString().slice(-8)}`;
-        // Save order as pending/paid for non-Razorpay (COD)
-        await fetch('/api/orders', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            orderId,
-            customerName: checkoutForm.name,
-            email: checkoutForm.email || currentUser?.email || '',
-            mobile: checkoutForm.mobile,
-            address: checkoutForm.address,
-            city: checkoutForm.city,
-            pincode: checkoutForm.pincode,
-            state: checkoutForm.state,
-            items: cart,
-            totalAmount: grandTotal,
-            paymentMethod: selectedPayment,
-            paymentStatus: selectedPayment === 'cod' ? 'pending' : 'paid'
-          })
-        });
-
-        setOrderPlaced(orderId);
+        // Handle COD or other non-Razorpay success (order already created as pending)
+        setOrderPlaced(internalOrderId);
         setCheckoutStep(4);
+        setPaying(false);
         setCart([]);
         // Clear DB Cart
         const token = getAuthToken();
@@ -553,8 +545,9 @@ export default function FreshGuardStore({ initialCategory = 'all', hideHero = fa
           });
         }
       }
-    } catch {
-      showToast('Payment failed. Please try again.', 'error');
+    } catch (err) {
+      console.error(err);
+      showToast('Order placement failed. Please try again.', 'error');
     } finally {
       setPaying(false);
     }

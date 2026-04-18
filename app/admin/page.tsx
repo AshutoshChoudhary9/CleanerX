@@ -30,37 +30,50 @@ export default function AdminDashboard() {
 
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();
-    const expectedPass = process.env.NEXT_PUBLIC_ADMIN_PASSWORD;
-    if (!expectedPass) {
-      console.error("ADMIN_PASSWORD is not set in environment variables.");
-      alert("Admin access is not configured. Please set NEXT_PUBLIC_ADMIN_PASSWORD.");
+    if (!password.trim()) {
+      alert("Please enter a password.");
       return;
     }
-    if (password.trim() === expectedPass.trim()) {
-      setAuthorized(true);
-      fetchData();
-    } else {
-      alert('Incorrect password');
-    }
+    // We don't verify on client anymore for security. 
+    // We just try to fetch data. If the password is wrong, the API will return 401.
+    setAuthorized(true);
+    fetchData();
   };
 
   const fetchData = async () => {
     setLoading(true);
     try {
       const prodRes = await fetch('/api/products');
+      if (!prodRes.ok) throw new Error('Failed to fetch products');
       const prodData = await prodRes.json();
       setProducts(prodData.products || []);
 
       const orderRes = await fetch('/api/orders', {
         headers: { 'Authorization': `Bearer ${password}` }
       });
+      
+      if (orderRes.status === 401) {
+        setAuthorized(false);
+        setPassword('');
+        alert('Incorrect password or unauthorized access.');
+        return;
+      }
+
+      if (!orderRes.ok) throw new Error('Failed to fetch orders');
+      
       const orderData = await orderRes.json();
       setOrders(orderData.orders || []);
     } catch (err) {
       console.error(err);
+      alert('Error connecting to the server. Please check your connection.');
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleLogout = () => {
+    setAuthorized(false);
+    setPassword('');
   };
 
   const handleAddProduct = async (e: React.FormEvent) => {
@@ -244,7 +257,7 @@ export default function AdminDashboard() {
               <button className={activeTab === 'stats' ? 'active' : ''} onClick={() => setActiveTab('stats')}>📊 Stats</button>
               <button className={activeTab === 'products' ? 'active' : ''} onClick={() => setActiveTab('products')}>🧴 Products</button>
               <button className={activeTab === 'orders' ? 'active' : ''} onClick={() => setActiveTab('orders')}>📋 Orders</button>
-              <button onClick={() => setAuthorized(false)} className="logout">Logout</button>
+              <button onClick={handleLogout} className="logout">Logout</button>
             </div>
           </nav>
 
