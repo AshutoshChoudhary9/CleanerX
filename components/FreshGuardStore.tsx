@@ -144,7 +144,7 @@ export default function FreshGuardStore({ initialCategory = 'all', hideHero = fa
             const variant = item.merchandise;
             const p = variant.product;
             return {
-              id: variant.id,
+              id: p.id,
               title: p.title,
               handle: p.handle,
               icon: p.featuredImage?.url || CATEGORY_ICON[p.tags?.[0]] || '🧴',
@@ -340,29 +340,29 @@ export default function FreshGuardStore({ initialCategory = 'all', hideHero = fa
         const target = prev.find(c => `${c.id}-${c.vol || 'std'}` === cartKey);
         // Rollback: if qty was incremented, decrement; if it was a new item, remove it
         if (target && target.qty > 1) return prev.map(c => `${c.id}-${c.vol || 'std'}` === cartKey ? { ...c, qty: c.qty - 1 } : c);
-        return prev.filter(c => `${c.id}-${c.vol || 'std'}` !== cartKey); // was === (inverted bug)
+        return prev.filter(c => `${c.id}-${c.vol || 'std'}` !== cartKey);
       });
     }
   };
 
-  const changeQty = async (id: string, delta: number) => {
+  const changeQty = async (cartKey: string, delta: number) => {
     if (!currentUser) {
       showToast('Please login to continue', 'error');
       return;
     }
 
-    const target = cart.find(c => `${c.id}-${c.vol || 'std'}` === id);
+    const target = cart.find(c => `${c.id}-${c.vol || 'std'}` === cartKey);
     if (!target) return;
 
     setCart(prev => {
-      const updated = prev.map(c => `${c.id}-${c.vol || 'std'}` === id ? { ...c, qty: c.qty + delta } : c);
+      const updated = prev.map(c => `${c.id}-${c.vol || 'std'}` === cartKey ? { ...c, qty: c.qty + delta } : c);
       return updated.filter(c => c.qty > 0);
     });
 
     const token = getAuthToken();
     if (!token) return;
 
-    // Use target.id (raw product ID), not the composite key, for API calls
+    // Use target.id (which could be product ID or variant ID) for API calls
     if (delta > 0 || (target.qty + delta > 0)) {
       await fetch('/api/cart/add', {
         method: 'POST',
@@ -382,16 +382,21 @@ export default function FreshGuardStore({ initialCategory = 'all', hideHero = fa
     }
   };
 
-  const removeFromCart = async (id: string) => {
+  const removeFromCart = async (productId: string, vol?: string) => {
     if (!currentUser) {
       showToast('Please login to continue', 'error');
       return;
     }
 
-    setCart(prev => prev.filter(c => c.id !== id));
+    const cartKey = `${productId}-${vol || 'std'}`;
+    const target = cart.find(c => `${c.id}-${c.vol || 'std'}` === cartKey);
+    if (!target) return;
+
+    setCart(prev => prev.filter(c => `${c.id}-${c.vol || 'std'}` !== cartKey));
+    
     const token = getAuthToken();
     if (token) {
-      await fetch(`/api/cart/remove/${id}`, {
+      await fetch(`/api/cart/remove/${target.id}`, {
         method: 'DELETE',
         headers: { Authorization: `Bearer ${token}` }
       });
@@ -995,7 +1000,7 @@ export default function FreshGuardStore({ initialCategory = 'all', hideHero = fa
                     <button className="qty-btn" onClick={() => changeQty(`${item.id}-${item.vol || 'std'}`, -1)}>−</button>
                     <div className="qty-num">{item.qty}</div>
                     <button className="qty-btn" onClick={() => changeQty(`${item.id}-${item.vol || 'std'}`, 1)}>+</button>
-                    <button className="ci-remove" onClick={() => removeFromCart(item.id)}>🗑 Remove</button>
+                    <button className="ci-remove" onClick={() => removeFromCart(item.id, item.vol)}>🗑 Remove</button>
                   </div>
                 </div>
               </div>

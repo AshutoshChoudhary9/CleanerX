@@ -37,19 +37,7 @@ export async function getProducts({ query, reverse, sortKey, category }: { query
   })) as unknown as ProductType[];
 }
 
-const SEED_PRODUCTS = [
-  { id: 'classic-floor-1', handle: 'classic-floor-1', title: 'FreshGuard Classic Floor Cleaner', icon: '🧴', price: 149, mrp: 199, tags: ['floor'], vol: '1 Litre', rating: 4.5, ratingCount: 2341, badge: 'Best Seller', variants: [{ id: 'classic-floor-1-v', title: '1 Litre', price: { amount: '149', currencyCode: 'INR' } }] },
-  { id: 'lavender-floor-2', handle: 'lavender-floor-2', title: 'FreshGuard Lavender Floor Liquid', icon: '💜', price: 169, mrp: 229, tags: ['floor'], vol: '2 Litre', rating: 4.3, ratingCount: 1892, badge: 'Top Rated', variants: [{ id: 'lavender-floor-2-v', title: '2 Litre', price: { amount: '169', currencyCode: 'INR' } }] },
-  { id: 'toilet-gel-750', handle: 'toilet-gel-750', title: 'FreshGuard HyperClean Toilet Gel', icon: '🚽', price: 129, mrp: 169, tags: ['toilet'], vol: '750 ml', rating: 4.7, ratingCount: 3421, badge: 'Best Seller', variants: [{ id: 'toilet-gel-750-v', title: '750 ml', price: { amount: '129', currencyCode: 'INR' } }] },
-  { id: 'glass-spray-500', handle: 'glass-spray-500', title: 'FreshGuard ClearView Glass Spray', icon: '🪟', price: 119, mrp: 159, tags: ['glass'], vol: '500 ml', rating: 4.6, ratingCount: 1876, badge: 'Best Seller', variants: [{ id: 'glass-spray-500-v', title: '500 ml', price: { amount: '119', currencyCode: 'INR' } }] },
-  { id: 'combo-essentials-3', handle: 'combo-essentials-3', title: 'Home Essentials Combo Pack', icon: '📦', price: 399, mrp: 499, tags: ['combo'], vol: '3-Pack', rating: 4.9, ratingCount: 452, badge: 'Value Pack', variants: [{ id: 'combo-3-v', title: '3-Pack', price: { amount: '399', currencyCode: 'INR' } }] },
-  { id: 'bulk-floor-20', handle: 'bulk-floor-20', title: 'Bulk Industrial Floor Disinfectant', icon: '🏭', price: 1299, mrp: 1699, tags: ['bulk'], vol: '20 Litre', rating: 4.8, ratingCount: 124, badge: 'Factory Price', variants: [{ id: 'bulk-20-v', title: '20 Litre', price: { amount: '1299', currencyCode: 'INR' } }] },
-  { id: 'festive-sparkle-pack', handle: 'festive-sparkle-pack', title: 'Festive Shine Limited Edition', icon: '🎉', price: 299, mrp: 399, tags: ['festive'], vol: 'Limited Edition', rating: 4.7, ratingCount: 89, badge: 'Seasonal', variants: [{ id: 'festive-v', title: 'Limited Edition', price: { amount: '299', currencyCode: 'INR' } }] },
-  { id: 'monthly-protection-sub', handle: 'monthly-protection-sub', title: 'Monthly Protection Membership', icon: '🔁', price: 449, mrp: 549, tags: ['subscribe'], vol: 'Monthly', rating: 5.0, ratingCount: 1205, badge: 'Subscription', variants: [{ id: 'sub-v', title: 'Monthly', price: { amount: '449', currencyCode: 'INR' } }] },
-  { id: 'ecogreen-all-purpose-cleaner', handle: 'ecogreen-all-purpose-cleaner', title: 'EcoGreen All-Purpose', icon: '🧴', price: 99, mrp: 179, tags: ['eco-friendly', 'floor'], vol: '500ml', rating: 4.5, badge: 'Hot', variants: [{ id: 'ecogreen-v1', title: '500ml', price: { amount: '99', currencyCode: 'INR' } }] },
-  { id: 'max-power-bathroom-cleaner', handle: 'max-power-bathroom-cleaner', title: 'Max Power Bathroom', icon: '🚽', price: 129, mrp: 229, tags: ['bathroom-cleaners', 'toilet'], vol: 'Spray', rating: 4.5, badge: 'Hot', variants: [{ id: 'maxpower-v1', title: 'Spray', price: { amount: '129', currencyCode: 'INR' } }] },
-  { id: 'crystal-clear-window-cleaner', handle: 'crystal-clear-window-cleaner', title: 'Crystal Clear Window', icon: '🪟', price: 119, mrp: 199, tags: ['window-care', 'glass'], vol: '1L', rating: 4.5, badge: 'Hot', variants: [{ id: 'crystal-v1', title: '1L', price: { amount: '119', currencyCode: 'INR' } }] },
-];
+// Local SEED_PRODUCTS removed as it is imported from ./seed-data
 
 export async function getProduct(handle: string): Promise<ProductType | undefined> {
   await connectToDatabase();

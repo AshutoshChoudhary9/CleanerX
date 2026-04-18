@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import connectToDatabase from 'lib/mongodb/db';
 import Order from 'lib/mongodb/models/Order';
+import Product from 'lib/mongodb/models/Product';
 import mongoose from 'mongoose';
 import { requireAuth } from 'lib/middleware/auth';
 import { verifyAuthToken } from 'lib/auth/jwt';
