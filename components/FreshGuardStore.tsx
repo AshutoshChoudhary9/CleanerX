@@ -404,12 +404,13 @@ export default function FreshGuardStore({ initialCategory = 'all', hideHero = fa
   };
 
   const cartTotal = Math.round(cart.reduce((a, c) => a + c.price * c.qty, 0) * 100) / 100;
+  const subDiscountAmt = Math.round(cart.reduce((a, c) => a + (c.price * c.qty * (c.metadata?.subDiscount || 0) / 100), 0) * 100) / 100;
   const cartQty = cart.reduce((a, c) => a + c.qty, 0);
   const delivery = cartTotal >= 299 || cartTotal === 0 ? 0 : 49;
   const comboDiscount = (cartTotal >= 299 && cartTotal > 0) ? 49 : 0;
-  const upiDiscount = selectedPayment === 'upi' ? Math.round(cartTotal * 0.1) : 0;
+  const upiDiscount = selectedPayment === 'upi' ? Math.round((cartTotal - subDiscountAmt) * 0.1) : 0;
   const codFee = selectedPayment === 'cod' ? 49 : 0;
-  const discount = comboDiscount + upiDiscount;
+  const discount = comboDiscount + upiDiscount + subDiscountAmt;
   const grandTotal = Math.max(0, Math.round((cartTotal + delivery - discount + codFee) * 100) / 100);
 
   // ── Wishlist ──
@@ -508,7 +509,7 @@ export default function FreshGuardStore({ initialCategory = 'all', hideHero = fa
                 ...(patchToken ? { Authorization: `Bearer ${patchToken}` } : {})
               },
               body: JSON.stringify({
-                orderId: response.razorpay_order_id,
+                orderId: internalOrderId,
                 status: 'paid',
                 razorpayPaymentId: response.razorpay_payment_id
               })
@@ -952,14 +953,13 @@ export default function FreshGuardStore({ initialCategory = 'all', hideHero = fa
         </div>
         {wishlist.length > 0 && (
           <div className="cart-footer">
-            <button className="checkout-btn" style={{ background: 'var(--primary)' }} onClick={() => { 
-                // Snapshot the wishlist before iteration so mutations don't skip items
+            <button className="checkout-btn" style={{ background: 'var(--primary)' }} onClick={async () => { 
                 const snapshot = [...wishlist];
-                snapshot.forEach(item => {
-                  addToCart(item);
-                  toggleWishlist(item); // Handles DB removal
-                });
                 setWishlistOpen(false); 
+                for (const item of snapshot) {
+                  await addToCart(item);
+                  await toggleWishlist(item); 
+                }
                 showToast('All items added to cart!'); 
               }}>🛒 Add All to Cart →</button>
           </div>
@@ -1107,7 +1107,8 @@ export default function FreshGuardStore({ initialCategory = 'all', hideHero = fa
                         </div>
                       ))}
                       <div className="os-item"><span>Delivery</span><span>{delivery === 0 ? 'FREE' : `₹${delivery}`}</span></div>
-                      <div className="os-item" style={{ color: 'var(--success)' }}><span>Free Shipping</span><span>{delivery === 0 ? '-₹49' : '₹0'}</span></div>
+                      {subDiscountAmt > 0 && <div className="os-item" style={{ color: 'var(--success)' }}><span>Subscription Savings</span><span>-₹{subDiscountAmt}</span></div>}
+                      {comboDiscount > 0 && <div className="os-item" style={{ color: 'var(--success)' }}><span>Bundle Discount</span><span>-₹{comboDiscount}</span></div>}
                       {upiDiscount > 0 && <div className="os-item" style={{ color: 'var(--success)' }}><span>UPI Off (10%)</span><span>-₹{upiDiscount}</span></div>}
                       {selectedPayment === 'cod' && <div className="os-item" style={{ color: '#ef4444' }}><span>COD Fee</span><span>+₹49</span></div>}
                       <div className="os-total"><span>Total Payable</span><span>₹{grandTotal}</span></div>

@@ -60,7 +60,7 @@ export async function POST(req: NextRequest) {
             }
             await userCart.save();
             await CartModel.deleteOne({ cartId: anonCart.cartId });
-            (await cookies()).set('cartId', userCart.cartId);
+            (await cookies()).set('cartId', userCart.cartId, { path: '/', sameSite: 'lax', httpOnly: true });
           } else if (!userCart) {
             // Link anonCart to user
             anonCart.userId = user._id;
@@ -68,13 +68,13 @@ export async function POST(req: NextRequest) {
           }
         } else if (userCart) {
           // No anonymous cart, but user has one from before
-          (await cookies()).set('cartId', userCart.cartId);
+          (await cookies()).set('cartId', userCart.cartId, { path: '/', sameSite: 'lax', httpOnly: true });
         }
       } else {
         // No anonymous cart cookie, check if user has a saved cart
         const userCart = await CartModel.findOne({ userId: user._id });
         if (userCart) {
-          (await cookies()).set('cartId', userCart.cartId);
+          (await cookies()).set('cartId', userCart.cartId, { path: '/', sameSite: 'lax', httpOnly: true });
         }
       }
     } catch (syncErr) {
