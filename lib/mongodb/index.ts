@@ -1,11 +1,51 @@
 import { Cart, Collection as CollectionType, Menu, Product as ProductType } from 'lib/shopify/types';
 import { cookies } from 'next/headers';
+import { NextRequest, NextResponse } from 'next/server';
 import connectToDatabase from './db';
 import CartModel from './models/Cart';
 import Collection from './models/Collection';
 import Product from './models/Product';
 import { verifyAuthToken } from 'lib/auth/jwt';
 import { SEED_PRODUCTS, KNOWN_PAGES } from './seed-data';
+
+function reshapeProduct(p: any): ProductType {
+  const price = p.price || (p.priceRange?.minVariantPrice?.amount) || '0';
+  const mrp = p.mrp || (p.priceRange?.maxVariantPrice?.amount) || price;
+  
+  return {
+    ...p,
+    id: p._id?.toString() || p.id,
+    availableForSale: p.availableForSale ?? true,
+    description: p.description || p.title,
+    descriptionHtml: p.descriptionHtml || `<p>${p.description || p.title}</p>`,
+    options: p.options || [{ id: 'vol', name: 'Volume', values: [p.vol || 'Standard'] }],
+    priceRange: p.priceRange || {
+      maxVariantPrice: { amount: mrp.toString(), currencyCode: 'INR' },
+      minVariantPrice: { amount: price.toString(), currencyCode: 'INR' }
+    },
+    variants: (p.variants || [{
+      id: (p._id?.toString() || p.id) + '-v1',
+      title: p.vol || 'Standard',
+      availableForSale: true,
+      selectedOptions: [{ name: 'Volume', value: p.vol || 'Standard' }],
+      price: { amount: price.toString(), currencyCode: 'INR' }
+    }]).map((v: any) => ({
+      ...v,
+      availableForSale: v.availableForSale ?? true,
+      selectedOptions: v.selectedOptions || [{ name: 'Volume', value: v.title }]
+    })),
+    featuredImage: p.featuredImage || {
+      url: p.icon ? '' : 'https://images.unsplash.com/photo-1584622650111-993a426fbf0a?q=80&w=400&h=400&auto=format&fit=crop',
+      altText: p.title,
+      width: 400,
+      height: 400
+    },
+    images: p.images || [],
+    seo: p.seo || { title: p.title, description: p.description || p.title },
+    tags: p.tags || [],
+    updatedAt: p.updatedAt || new Date().toISOString()
+  } as unknown as ProductType;
+}
 
 export async function getProducts({ query, reverse, sortKey, category }: { query?: string; reverse?: boolean; sortKey?: string; category?: string }): Promise<ProductType[]> {
   await connectToDatabase();
@@ -26,15 +66,13 @@ export async function getProducts({ query, reverse, sortKey, category }: { query
   const products = await Product.find(filter).collation({ locale: 'en_US', numericOrdering: true }).sort(sort).lean();
   
   if (!products.length && !query) {
-    if (!category || category === 'all') return SEED_PRODUCTS as any;
-    return SEED_PRODUCTS.filter(p => p.tags.some(t => t.toLowerCase().includes(category.toLowerCase()))) as any;
+    const seeds = (!category || category === 'all') 
+      ? SEED_PRODUCTS 
+      : SEED_PRODUCTS.filter(p => p.tags.some(t => t.toLowerCase().includes(category.toLowerCase())));
+    return seeds.map(reshapeProduct);
   }
 
-  return products.map(p => ({
-    ...p,
-    id: p._id.toString(),
-    _id: p._id.toString()
-  })) as unknown as ProductType[];
+  return products.map(reshapeProduct);
 }
 
 // Local SEED_PRODUCTS removed as it is imported from ./seed-data
@@ -43,9 +81,10 @@ export async function getProduct(handle: string): Promise<ProductType | undefine
   await connectToDatabase();
   const product = await Product.findOne({ handle }).lean();
   if (!product) {
-    return SEED_PRODUCTS.find(p => p.handle === handle) as any;
+    const seedP = SEED_PRODUCTS.find(p => p.handle === handle);
+    return seedP ? reshapeProduct(seedP) : undefined;
   }
-  return { ...product, id: product._id.toString(), _id: product._id.toString() } as unknown as ProductType;
+  return reshapeProduct(product);
 }
 
 export async function getCollections(): Promise<CollectionType[]> {
@@ -70,10 +109,46 @@ export async function getCollection(handle: string): Promise<CollectionType | un
   return { ...collection, id: collection._id.toString(), _id: collection._id.toString() } as unknown as CollectionType;
 }
 
-export async function getCollectionProducts({ collection }: { collection: string }): Promise<ProductType[]> {
+export async function getCollectionProducts({ 
+  collection, 
+  sortKey, 
+  reverse 
+}: { 
+  collection: string; 
+  sortKey?: string; 
+  reverse?: boolean; 
+}): Promise<ProductType[]> {
   await connectToDatabase();
-  const products = await Product.find({ tags: collection }).lean();
-  return products.map(p => ({ ...p, id: p._id.toString(), _id: p._id.toString() })) as unknown as ProductType[];
+  
+  let sort: any = {};
+  if (sortKey === 'PRICE') sort['variants.0.price.amount'] = reverse ? -1 : 1;
+  else if (sortKey === 'CREATED_AT') sort.createdAt = reverse ? -1 : 1;
+
+  const products = await Product.find({ tags: collection }).sort(sort).lean();
+  
+  if (!products.length) {
+    // Fallback to seeds
+    return SEED_PRODUCTS
+      .filter(p => p.tags.some(t => t.toLowerCase().includes(collection.toLowerCase())))
+      .map(reshapeProduct);
+  }
+
+  return products.map(reshapeProduct);
+}
+
+export async function revalidate(req: NextRequest): Promise<NextResponse> {
+  // We can use Next.js revalidateTag or revalidatePath here
+  // For this implementation, we'll just return a success message
+  // as the actual logic depends on how the user wants to trigger it.
+  const { revalidateTag, revalidatePath } = await import('next/cache');
+  const { searchParams } = new URL(req.url);
+  const tag = searchParams.get('tag');
+  const path = searchParams.get('path');
+
+  if (tag) revalidateTag(tag);
+  if (path) revalidatePath(path);
+
+  return NextResponse.json({ revalidated: true, now: Date.now() });
 }
 
 export async function getMenu(handle: string): Promise<Menu[]> {
@@ -130,7 +205,12 @@ export async function getCartById(cartId: string): Promise<Cart | undefined> {
             id: seedP.id,
             handle: seedP.handle,
             title: seedP.title,
-            featuredImage: { url: seedP.icon || '🧴' },
+            featuredImage: { 
+              url: seedP.icon || 'https://images.unsplash.com/photo-1584622650111-993a426fbf0a?q=80&w=400&h=400&auto=format&fit=crop', 
+              altText: seedP.title, 
+              width: 400, 
+              height: 400 
+            },
             tags: seedP.tags
           }
         }
@@ -318,5 +398,11 @@ export async function getProductRecommendations(productId: string) {
     _id: { $ne: currentProduct?._id },
     ...(currentProduct?.tags?.length ? { tags: { $in: currentProduct.tags } } : {})
   }).limit(4).lean();
-  return recommendations.map(p => ({ ...p, id: p._id.toString(), _id: p._id.toString() })) as unknown as ProductType[];
+
+  if (!recommendations.length) {
+    // Fallback to seeds
+    return SEED_PRODUCTS.slice(0, 4).map(reshapeProduct);
+  }
+
+  return recommendations.map(reshapeProduct);
 }

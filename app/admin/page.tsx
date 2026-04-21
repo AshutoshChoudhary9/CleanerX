@@ -36,7 +36,6 @@ export default function AdminDashboard() {
     }
     // We don't verify on client anymore for security. 
     // We just try to fetch data. If the password is wrong, the API will return 401.
-    setAuthorized(true);
     fetchData();
   };
 
@@ -51,6 +50,10 @@ export default function AdminDashboard() {
       const orderRes = await fetch('/api/orders', {
         headers: { 'Authorization': `Bearer ${password}` }
       });
+      
+      if (orderRes.ok) {
+        setAuthorized(true);
+      }
       
       if (orderRes.status === 401) {
         setAuthorized(false);
