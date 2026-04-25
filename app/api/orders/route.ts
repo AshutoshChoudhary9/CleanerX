@@ -47,6 +47,7 @@ export async function POST(req: NextRequest) {
     }).lean();
 
     let serverTotal = 0;
+    let subDiscountAmt = 0;
     const validatedItems = items.map((item: any) => {
       let p = dbProducts.find((dbP: any) => dbP._id.toString() === item.id || dbP.handle === item.id);
       
@@ -58,7 +59,14 @@ export async function POST(req: NextRequest) {
       }
       
       const price = parseFloat(p.price || (p.priceRange?.minVariantPrice?.amount) || '0');
-      serverTotal += price * item.qty;
+      const itemSubtotal = price * item.qty;
+      serverTotal += itemSubtotal;
+
+      // Calculate subscription discount if metadata exists
+      const subDiscount = (p as any).metadata?.subDiscount || 0;
+      if (subDiscount > 0) {
+        subDiscountAmt += (itemSubtotal * subDiscount) / 100;
+      }
       
       return {
         ...item,
@@ -66,13 +74,16 @@ export async function POST(req: NextRequest) {
       };
     });
 
+    // Round values to 2 decimal places as in frontend
+    subDiscountAmt = Math.round(subDiscountAmt * 100) / 100;
+
     // Handle discounts/fees logic server-side
     const delivery = serverTotal >= 299 || serverTotal === 0 ? 0 : 49;
     const comboDiscount = (serverTotal >= 299 && serverTotal > 0) ? 49 : 0;
-    const upiDiscount = paymentMethod === 'upi' ? Math.round(serverTotal * 0.1) : 0;
+    const upiDiscount = paymentMethod === 'upi' ? Math.round((serverTotal - subDiscountAmt) * 0.1) : 0;
     const codFee = paymentMethod === 'cod' ? 49 : 0;
     
-    const finalTotal = Math.max(0, serverTotal + delivery - comboDiscount - upiDiscount + codFee);
+    const finalTotal = Math.max(0, Math.round((serverTotal + delivery - comboDiscount - upiDiscount - subDiscountAmt + codFee) * 100) / 100);
 
     const order = new Order({
       userId: user.userId, // Link order to the logged-in user

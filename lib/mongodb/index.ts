@@ -173,15 +173,21 @@ export async function getCartById(cartId: string): Promise<Cart | undefined> {
   const cartDoc = await CartModel.findOne({ cartId }).lean();
   if (!cartDoc) return undefined;
 
-  const lines = await Promise.all(cartDoc.items.map(async (item: any) => {
-    // merchandiseId can be a product _id, handle, or variant id
-    const product = await Product.findOne({
-      $or: [
-        { _id: item.merchandiseId.length === 24 ? item.merchandiseId : undefined },
-        { handle: item.merchandiseId },
-        { 'variants.id': item.merchandiseId }
-      ].filter(Boolean)
-    }).lean();
+  const merchandiseIds = cartDoc.items.map((i: any) => i.merchandiseId);
+  const products = await Product.find({
+    $or: [
+      { _id: { $in: merchandiseIds.filter((id: string) => /^[0-9a-fA-F]{24}$/.test(id)) } },
+      { handle: { $in: merchandiseIds } },
+      { 'variants.id': { $in: merchandiseIds } }
+    ]
+  }).lean();
+
+  const lines = cartDoc.items.map((item: any) => {
+    let product = products.find((p: any) => 
+      p._id.toString() === item.merchandiseId || 
+      p.handle === item.merchandiseId || 
+      p.variants.some((v: any) => v.id === item.merchandiseId)
+    );
 
     if (!product) {
       // Fallback to seed data
@@ -211,7 +217,8 @@ export async function getCartById(cartId: string): Promise<Cart | undefined> {
               width: 400, 
               height: 400 
             },
-            tags: seedP.tags
+            tags: seedP.tags,
+            metadata: (seedP as any).metadata || {}
           }
         }
       };
@@ -239,11 +246,12 @@ export async function getCartById(cartId: string): Promise<Cart | undefined> {
           handle: product.handle,
           title: product.title,
           featuredImage: product.featuredImage,
-          tags: product.tags
+          tags: product.tags,
+          metadata: product.metadata || {}
         }
       }
     };
-  }));
+  });
 
   const activeLines = lines.filter(Boolean) as any[];
   const subtotal = activeLines.reduce((acc, line: any) => acc + parseFloat(line.cost.totalAmount.amount), 0);
