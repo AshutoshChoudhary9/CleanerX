@@ -143,18 +143,23 @@ export default function FreshGuardStore({ initialCategory = 'all', hideHero = fa
           const cartProducts = cartItems.map((item: any) => {
             const variant = item.merchandise;
             const p = variant.product;
+            const price = parseFloat(item.cost.totalAmount.amount) / item.quantity;
+            // Use server-side MRP if available in metadata or fallback to a reasonable estimate
+            const mrp = p.mrp || (price * 1.3); 
+            
             return {
               id: p.id,
               title: p.title,
               handle: p.handle,
               icon: p.featuredImage?.url || CATEGORY_ICON[p.tags?.[0]] || '🧴',
-              price: parseFloat(item.cost.totalAmount.amount) / item.quantity,
-              mrp: (parseFloat(item.cost.totalAmount.amount) / item.quantity) * 1.3,
+              price: price,
+              mrp: mrp,
               tags: p.tags || [],
               vol: variant.title || 'Standard',
               rating: 4.5,
               ratingCount: 120,
               qty: item.quantity,
+              metadata: p.metadata || {}
             } as CartItem;
           });
           setCart(cartProducts);
@@ -837,7 +842,11 @@ export default function FreshGuardStore({ initialCategory = 'all', hideHero = fa
                  return (
                   <div key={p.id} className="prod-card" onClick={() => { setSelectedProduct(product); setModalState('product'); }}>
                     <div className="prod-img">
-                      {itemIcon}
+                      {itemIcon.startsWith('http') ? (
+                        <img src={itemIcon} alt={p.title} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                      ) : (
+                        <span style={{ fontSize: 64 }}>{itemIcon}</span>
+                      )}
                       {product.badge && <div className={`prod-badge ${badgeClass}`}>{product.badge}</div>}
                       <div className={`prod-wishlist ${inWish ? 'active' : ''}`} onClick={(e) => { e.stopPropagation(); toggleWishlist(product); }}>
                         {inWish ? '❤️' : '🤍'}
@@ -937,7 +946,11 @@ export default function FreshGuardStore({ initialCategory = 'all', hideHero = fa
           ) : (
             wishlist.map(item => (
               <div key={item.id} className="cart-item">
-                <div className="ci-img">{item.icon}</div>
+                <div className="ci-img">
+                  {item.icon && item.icon.startsWith('http') ? (
+                    <img src={item.icon} alt={item.title} style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: 4 }} />
+                  ) : item.icon}
+                </div>
                 <div className="ci-info">
                   <div className="ci-name">{item.title}</div>
                   <div className="ci-vol">{item.vol}</div>
@@ -983,7 +996,11 @@ export default function FreshGuardStore({ initialCategory = 'all', hideHero = fa
           ) : (
             cart.map(item => (
               <div key={item.id} className="cart-item">
-                <div className="ci-img">{item.icon}</div>
+                <div className="ci-img">
+                  {item.icon && item.icon.startsWith('http') ? (
+                    <img src={item.icon} alt={item.title} style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: 4 }} />
+                  ) : item.icon}
+                </div>
                 <div className="ci-info">
                   <div className="ci-name">{item.title}</div>
                   <div className="ci-vol">{item.vol}</div>
@@ -1025,7 +1042,11 @@ export default function FreshGuardStore({ initialCategory = 'all', hideHero = fa
             <div className="modal-body">
               {modalState === 'product' && selectedProduct ? (
                 <>
-                  <div style={{ textAlign: 'center', background: 'linear-gradient(135deg,#f8faff,#eff4ff)', borderRadius: 10, padding: 30, marginBottom: 20, fontSize: 80 }}>{selectedProduct.icon}</div>
+                  <div style={{ textAlign: 'center', background: 'linear-gradient(135deg,#f8faff,#eff4ff)', borderRadius: 10, padding: 30, marginBottom: 20, fontSize: 80, display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
+                    {selectedProduct.icon && selectedProduct.icon.startsWith('http') ? (
+                      <img src={selectedProduct.icon} alt={selectedProduct.title} style={{ maxWidth: '100%', maxHeight: '200px', objectFit: 'contain' }} />
+                    ) : selectedProduct.icon}
+                  </div>
                   <h3 style={{ fontFamily: "'Baloo 2',sans-serif", fontSize: 22, fontWeight: 800 }}>{selectedProduct.title}</h3>
                   {selectedProduct.rating! > 0 && (
                     <div style={{ display: 'flex', alignItems: 'center', gap: 10, margin: '12px 0' }}>
